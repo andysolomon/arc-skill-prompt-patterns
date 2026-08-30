@@ -36,3 +36,23 @@ export {
   validateInput,
   validateOutput
 } from "./contract.mjs";
+
+export {
+  assertModelProfile,
+  isValidModelProfile,
+  MODEL_PROFILE_ALIASES,
+  MODEL_PROFILE_BINDINGS,
+  MODEL_PROFILE_FIXTURES,
+  MODEL_PROFILE_IDS,
+  MODEL_PROFILE_SCHEMA,
+  MODEL_PROFILES,
+  MODEL_PROFILES_BY_ID,
+  ModelProfileValidationError,
+  normalizeModelProfile,
+  parseModelProfile,
+  REASONING_EFFORTS,
+  resolveModelProfile,
+  SUPPORTED_MODEL_BINDINGS,
+  UNKNOWN_MODEL_PROFILE,
+  validateModelProfile
+} from "./profiles.mjs";
