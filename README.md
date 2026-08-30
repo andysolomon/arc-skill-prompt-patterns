@@ -40,7 +40,24 @@ The output shape has exactly these top-level fields:
 
 Input and output values must be inert JSON-compatible data made from plain objects, arrays, and supported scalar values. Accessor properties, including getters and setters, are rejected by inspecting own property descriptors and are never invoked.
 
-The contract intentionally has no fields for `route`, `workload`, `authorization`, `visible-chain-of-thought`, `accuracy-guarantee`, or `mandatory-temperature`. These execution concerns, model profiles, and recommendation-selection rules remain outside this package. No selector implementation is included.
+The contract intentionally has no fields for `route`, `workload`, `authorization`, `visible-chain-of-thought`, `accuracy-guarantee`, or `mandatory-temperature`. These execution concerns and recommendation-selection rules remain outside the contract. No selector implementation is included.
+
+## Model profiles
+
+The standalone `profiles.mjs` surface records capability-only, schema-validated profiles for the model aliases supported by ARC route bindings. Profiles describe schema output, tool use, reasoning-effort controls, sampling controls, positive context limits, and notes keyed only by catalog pattern IDs. They are immutable and have exactly these fields:
+
+```js
+{
+  id, name, verified, schemaOutput, toolUse, reasoning,
+  sampling, contextLimits, verifiedPatternNotes
+}
+```
+
+`resolveModelProfile(model)` trims and case-folds a model alias, then returns its canonical frozen profile. Unrecognized and non-string inputs return the frozen, conservative `UNKNOWN_MODEL_PROFILE`. Only base aliases and stable/provider model IDs are bindings; complete route names with execution suffixes are intentionally not model aliases.
+
+`MODEL_PROFILE_SCHEMA`, the profile fixtures, ID/map/binding constants, and the normalization and validation helpers are exported from the package. Profile validation is strict: unknown keys and accessors are rejected recursively, and normalized values are deeply frozen.
+
+Profiles are descriptive capability data, not a recommender. ARC Pi continues to own route, workload, authorization, and task-execution decisions; resolving a profile does not authorize or select execution.
 
 ## Development
 

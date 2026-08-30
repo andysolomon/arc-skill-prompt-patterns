@@ -82,6 +82,40 @@ export interface ValidationIssue {
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+export type ModelProfileId =
+  | "claude-fable-5"
+  | "gpt-5.6-sol"
+  | "gpt-5.6-luna"
+  | "gpt-5.5"
+  | "claude-opus-5"
+  | "claude-opus-4-8"
+  | "cursor-grok-4.6-high"
+  | "kimi-k3"
+  | "MiniMax-M3"
+  | "composer-2.5";
+
+export interface ModelProfile {
+  readonly id: string;
+  readonly name: string;
+  readonly verified: boolean;
+  readonly schemaOutput: Readonly<{ supported: boolean }>;
+  readonly toolUse: Readonly<{ supported: boolean }>;
+  readonly reasoning: Readonly<{
+    supported: boolean;
+    effortLevels: readonly ReasoningEffort[];
+  }>;
+  readonly sampling: Readonly<{
+    temperature: boolean;
+    topP: boolean;
+  }>;
+  readonly contextLimits: Readonly<{
+    contextWindowTokens: number;
+    maxOutputTokens: number;
+  }>;
+  readonly verifiedPatternNotes: Readonly<Partial<Record<PatternId, string>>>;
+}
+
 export const PATTERN_IDS: readonly [
   "template-fill",
   "few-shot",
@@ -157,3 +191,26 @@ export const assertInput: typeof normalizeInput;
 export const assertOutput: typeof normalizeOutput;
 export function isValidInput(input: unknown): input is PromptPatternInput;
 export function isValidOutput(output: unknown): output is PromptPatternOutput;
+
+export const REASONING_EFFORTS: readonly ["low", "medium", "high", "xhigh", "max", "ultra"];
+export const MODEL_PROFILE_SCHEMA: JsonSchema;
+export const MODEL_PROFILE_IDS: readonly ModelProfileId[];
+export const MODEL_PROFILES: readonly Readonly<ModelProfile>[];
+export const MODEL_PROFILE_FIXTURES: typeof MODEL_PROFILES;
+export const MODEL_PROFILES_BY_ID: Readonly<Record<ModelProfileId, Readonly<ModelProfile>>>;
+export const MODEL_PROFILE_BINDINGS: Readonly<Record<string, ModelProfileId>>;
+export const MODEL_PROFILE_ALIASES: typeof MODEL_PROFILE_BINDINGS;
+export const SUPPORTED_MODEL_BINDINGS: typeof MODEL_PROFILE_BINDINGS;
+export const UNKNOWN_MODEL_PROFILE: Readonly<ModelProfile>;
+
+export class ModelProfileValidationError extends TypeError {
+  constructor(issues: readonly ValidationIssue[]);
+  readonly issues: readonly ValidationIssue[];
+}
+
+export function normalizeModelProfile(profile: unknown): Readonly<ModelProfile>;
+export const validateModelProfile: typeof normalizeModelProfile;
+export const parseModelProfile: typeof normalizeModelProfile;
+export const assertModelProfile: typeof normalizeModelProfile;
+export function isValidModelProfile(profile: unknown): profile is ModelProfile;
+export function resolveModelProfile(model: unknown): Readonly<ModelProfile>;
