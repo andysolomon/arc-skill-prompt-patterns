@@ -12,6 +12,6 @@ On completion, move this file and the plan to docs/archive/.
     [x] 3.1 - Add representative and Cartesian recommendation tests
     [x] 3.2 - Add determinism, immutability, automatic-mode, and policy-boundary tests
     [x] 3.3 - Run npm test and inspect issue-scoped diff
-[ ] 4.0 - Ship & archive
-    [ ] 4.1 - Commit and open the shipping PR
+[x] 4.0 - Ship & archive
+    [x] 4.1 - Commit and open the shipping PR
     [ ] 4.2 - On merge: move docs/W-000016-IMPLEMENTATION_PLAN.md + docs/W-000016-progress.txt to docs/archive/
