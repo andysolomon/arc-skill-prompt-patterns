@@ -1,0 +1,23 @@
+{
+  "name": "arc-skill-prompt-patterns",
+  "version": "0.1.0",
+  "description": "A dependency-free catalog and typed contract for descriptive prompt patterns.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./prompt-patterns/index.d.ts",
+      "import": "./prompt-patterns/index.mjs",
+      "default": "./prompt-patterns/index.mjs"
+    }
+  },
+  "files": [
+    "prompt-patterns",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/prompt-patterns-schema.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
