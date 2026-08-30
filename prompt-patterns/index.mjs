@@ -56,3 +56,5 @@ export {
   UNKNOWN_MODEL_PROFILE,
   validateModelProfile
 } from "./profiles.mjs";
+
+export { recommend } from "./recommender.mjs";
