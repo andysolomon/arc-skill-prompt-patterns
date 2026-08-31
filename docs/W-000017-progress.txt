@@ -1,0 +1,17 @@
+W-000017 - Offline Prompt-Pattern Evaluation Fixtures - Progress
+Generated: 2026-08-31 17:26:00 UTC
+On completion, move this file and the plan to docs/archive/.
+
+[x] 1.0 - Phase 1 - Fixture corpus and index
+    [x] 1.1 - Add source-guide task fixtures with literal expected results
+    [x] 1.2 - Add ARC lifecycle fixtures and validate required coverage
+    [x] 1.3 - Export a strict fixture index with unique IDs and valid shapes
+[x] 2.0 - Phase 2 - Offline evaluation
+    [x] 2.1 - Add fixture-driven recommendation regression assertions
+    [x] 2.2 - Compare primary, overlays, warnings, and confidence deterministically
+[x] 3.0 - Phase 3 - Side-effect and matrix evidence
+    [x] 3.1 - Prove evaluation needs no providers, network, child processes, or writes
+    [x] 3.2 - Run focused and full test commands
+[ ] 4.0 - Ship & archive
+    [x] 4.1 - Verify / open shipping PR
+    [ ] 4.2 - On merge: move docs/W-000017-IMPLEMENTATION_PLAN.md + docs/W-000017-progress.txt to docs/archive/
