@@ -13,5 +13,5 @@ On completion, move this file and the plan to docs/archive/.
     [x] 3.1 - Prove evaluation needs no providers, network, child processes, or writes
     [x] 3.2 - Run focused and full test commands
 [ ] 4.0 - Ship & archive
-    [ ] 4.1 - Verify / open shipping PR
+    [x] 4.1 - Verify / open shipping PR
     [ ] 4.2 - On merge: move docs/W-000017-IMPLEMENTATION_PLAN.md + docs/W-000017-progress.txt to docs/archive/
