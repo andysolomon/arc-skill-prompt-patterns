@@ -15,5 +15,5 @@ On completion, move this file and the plan to docs/archive/.
     [x] 3.2 - Prove no worker, provider, network, or filesystem side effects
     [x] 3.3 - Run focused/full tests and package smoke check
 [ ] 4.0 - Ship & archive
-    [ ] 4.1 - Verify / open shipping PR
+    [x] 4.1 - Verify / open shipping PR
     [ ] 4.2 - On merge: move docs/W-000018-IMPLEMENTATION_PLAN.md + docs/W-000018-progress.txt to docs/archive/
