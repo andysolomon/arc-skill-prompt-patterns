@@ -84,6 +84,42 @@ The standalone `profiles.mjs` surface records capability-only, schema-validated 
 
 Profiles are descriptive capability data consumed by explicit-target recommendations. ARC Pi continues to own route, workload, authorization, and task-execution decisions; resolving a profile does not authorize or select execution.
 
+## Command-line interface
+
+The dependency-free `arc-prompt recommend` command exposes the same recommender for shell scripts and operators. A flag-based invocation defaults to deterministic human-readable output:
+
+```sh
+arc-prompt recommend \
+  --task-type research \
+  --arc-phase research \
+  --reliability-tier high-assurance \
+  --risk medium \
+  --target-mode automatic \
+  --output-shape structured \
+  --ambiguity low \
+  --max-tokens 4096 \
+  --max-latency-ms 10000
+```
+
+Use `--format json` (or `--json`) for stable JSON output. Scripts can supply the complete strict contract as JSON instead of individual input flags:
+
+```sh
+arc-prompt recommend --format json --input-json '{
+  "taskType": "research",
+  "arcPhase": "research",
+  "reliabilityTier": "high-assurance",
+  "risk": "medium",
+  "target": { "mode": "explicit", "model": "sol" },
+  "outputShape": "structured",
+  "ambiguity": "low",
+  "budget": { "maxTokens": 4096, "maxLatencyMs": 10000 }
+}'
+```
+
+`--target-model` is optional when `--target-mode` is provided, and it may also be used by itself because the public contract accepts model-only targets. JSON input cannot be mixed with recommendation input flags. Unknown options, malformed JSON, missing fields, and invalid contract values produce a diagnostic on stderr and a nonzero exit.
+
+The command only selects and explains prompt patterns. It does not execute tasks, call workers, providers, or networks, write project files, select routes or workloads, grant authorization, or infer execution-policy settings.
+
 ## Development
 
 ```sh
