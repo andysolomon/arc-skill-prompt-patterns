@@ -324,7 +324,7 @@ test("keeps execution concerns outside the executable contract", () => {
     assertInvalid(() => normalizeOutput(output), `$.${key}`);
   }
 
-  assert.equal(Object.hasOwn(promptPatterns, "recommend"), false);
+  assert.equal(typeof promptPatterns.recommend, "function");
   assert.equal(Object.hasOwn(INPUT_SCHEMA.properties, "route"), false);
   assert.equal(Object.hasOwn(OUTPUT_SCHEMA.properties, "workload"), false);
   assert.deepEqual(ARC_PHASES, ["explore", "analyze", "research", "plan", "implement", "verify", "deploy"]);

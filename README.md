@@ -1,6 +1,6 @@
 # arc-skill-prompt-patterns
 
-Dependency-free ESM catalog and typed contract for describing prompt-pattern recommendations in ARC workflows. Pattern guidance is descriptive; this package does not select a pattern or execute a task.
+Dependency-free ESM catalog, typed contract, and deterministic prompt-pattern recommender for ARC workflows. Recommendations are descriptive; this package does not execute tasks or make execution-policy decisions.
 
 ## Catalog
 
@@ -40,7 +40,32 @@ The output shape has exactly these top-level fields:
 
 Input and output values must be inert JSON-compatible data made from plain objects, arrays, and supported scalar values. Accessor properties, including getters and setters, are rejected by inspecting own property descriptors and are never invoked.
 
-The contract intentionally has no fields for `route`, `workload`, `authorization`, `visible-chain-of-thought`, `accuracy-guarantee`, or `mandatory-temperature`. These execution concerns and recommendation-selection rules remain outside the contract. No selector implementation is included.
+The contract intentionally has no fields for `route`, `workload`, `authorization`, `visible-chain-of-thought`, `accuracy-guarantee`, or `mandatory-temperature`. These execution concerns remain outside the contract.
+
+## Recommender
+
+`recommend(input)` validates the strict input contract and returns a valid, deeply frozen recommendation:
+
+```js
+import { recommend } from "arc-skill-prompt-patterns";
+
+const recommendation = recommend({
+  taskType: "research",
+  arcPhase: "research",
+  reliabilityTier: "high-assurance",
+  risk: "medium",
+  target: { mode: "automatic" },
+  outputShape: "structured",
+  ambiguity: "low",
+  budget: { maxTokens: 4096, maxLatencyMs: 10_000 }
+});
+```
+
+The pure rule engine considers every input dimension. It selects a primary from the fixed catalog, ranks compatible overlays, and supplies prompt fragments, phase guidance, warnings, rationale, and confidence. Equal scores use catalog order as a stable tie-break. Tight token or latency budgets reduce optional guidance and add descriptive warnings; they do not trigger any external behavior.
+
+In `automatic` target mode, an optional model hint is deliberately ignored, so identical task inputs remain model-neutral. In explicit or model-only targets, known profiles can add capability guidance for schema output, tool-use shapes, or reasoning controls. Unknown profiles use conservative warnings. These adjustments describe prompting only and never choose a model or authorize an action.
+
+Calls are deterministic for equivalent data, do not mutate input values, and return fresh deeply frozen output copies. Invalid inputs raise `ContractValidationError` through the same strict normalization API used by the public contract.
 
 ## Model profiles
 
@@ -57,7 +82,7 @@ The standalone `profiles.mjs` surface records capability-only, schema-validated 
 
 `MODEL_PROFILE_SCHEMA`, the profile fixtures, ID/map/binding constants, and the normalization and validation helpers are exported from the package. Profile validation is strict: unknown keys and accessors are rejected recursively, and normalized values are deeply frozen.
 
-Profiles are descriptive capability data, not a recommender. ARC Pi continues to own route, workload, authorization, and task-execution decisions; resolving a profile does not authorize or select execution.
+Profiles are descriptive capability data consumed by explicit-target recommendations. ARC Pi continues to own route, workload, authorization, and task-execution decisions; resolving a profile does not authorize or select execution.
 
 ## Development
 

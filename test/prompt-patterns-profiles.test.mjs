@@ -131,7 +131,7 @@ test("normalization copies data and rejects unknown keys and accessors without r
   assert.equal(reads, 0);
 });
 
-test("profiles remain isolated from execution policy and recommendation behavior", async () => {
+test("profiles remain isolated from execution policy", async () => {
   const prohibited = [
     "route",
     "workload",
@@ -147,7 +147,7 @@ test("profiles remain isolated from execution policy and recommendation behavior
       assert.equal(serialized.includes(key), false, key);
     }
   }
-  assert.equal(Object.hasOwn(promptPatterns, "recommend"), false);
+  assert.equal(typeof promptPatterns.recommend, "function");
 
   const declarations = await readFile(new URL("../prompt-patterns/index.d.ts", import.meta.url), "utf8");
   for (const name of Object.keys(promptPatterns)) {

@@ -191,6 +191,7 @@ export const assertInput: typeof normalizeInput;
 export const assertOutput: typeof normalizeOutput;
 export function isValidInput(input: unknown): input is PromptPatternInput;
 export function isValidOutput(output: unknown): output is PromptPatternOutput;
+export function recommend(input: PromptPatternInput): Readonly<PromptPatternOutput>;
 
 export const REASONING_EFFORTS: readonly ["low", "medium", "high", "xhigh", "max", "ultra"];
 export const MODEL_PROFILE_SCHEMA: JsonSchema;

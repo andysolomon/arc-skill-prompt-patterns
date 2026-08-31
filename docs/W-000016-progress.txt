@@ -1,0 +1,17 @@
+W-000016 - Deterministic Prompt-Pattern Recommendation Engine - Progress
+Generated: 2026-08-30 22:40:00 UTC
+On completion, move this file and the plan to docs/archive/.
+
+[x] 1.0 - Phase 1 - Recommendation engine foundation
+    [x] 1.1 - Implement pure deterministic rule evaluation in prompt-patterns/recommender.mjs
+    [x] 1.2 - Produce validated, bounded, immutable output without execution-policy fields
+[x] 2.0 - Phase 2 - Public API and type surface
+    [x] 2.1 - Export recommend from prompt-patterns/index.mjs
+    [x] 2.2 - Add TypeScript declarations and README documentation
+[x] 3.0 - Phase 3 - Verification matrix and regression tests
+    [x] 3.1 - Add representative and Cartesian recommendation tests
+    [x] 3.2 - Add determinism, immutability, automatic-mode, and policy-boundary tests
+    [x] 3.3 - Run npm test and inspect issue-scoped diff
+[x] 4.0 - Ship & archive
+    [x] 4.1 - Commit and open the shipping PR
+    [ ] 4.2 - On merge: move docs/W-000016-IMPLEMENTATION_PLAN.md + docs/W-000016-progress.txt to docs/archive/
