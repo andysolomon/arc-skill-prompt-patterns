@@ -1,0 +1,19 @@
+W-000018 - arc-prompt CLI - Progress
+Generated: 2026-08-31 17:26:00 UTC
+On completion, move this file and the plan to docs/archive/.
+
+[x] 1.0 - Phase 1 - CLI parser and executable
+    [x] 1.1 - Add the importable arc-prompt runner and executable boundary
+    [x] 1.2 - Parse flag and JSON-input recommendation dimensions
+    [x] 1.3 - Reject invalid, unknown, missing, or contradictory input
+[x] 2.0 - Phase 2 - Stable output and documentation
+    [x] 2.1 - Register and package the arc-prompt binary
+    [x] 2.2 - Add deterministic JSON and human-readable renderers
+    [x] 2.3 - Document examples and execution-neutral boundaries
+[x] 3.0 - Phase 3 - CLI regression and safety tests
+    [x] 3.1 - Add valid, invalid, parity, snapshot, and help coverage
+    [x] 3.2 - Prove no worker, provider, network, or filesystem side effects
+    [x] 3.3 - Run focused/full tests and package smoke check
+[ ] 4.0 - Ship & archive
+    [x] 4.1 - Verify / open shipping PR
+    [ ] 4.2 - On merge: move docs/W-000018-IMPLEMENTATION_PLAN.md + docs/W-000018-progress.txt to docs/archive/

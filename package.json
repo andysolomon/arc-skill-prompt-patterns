@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "A dependency-free catalog and typed contract for descriptive prompt patterns.",
   "type": "module",
+  "bin": {
+    "arc-prompt": "./bin/arc-prompt.mjs"
+  },
   "exports": {
     ".": {
       "types": "./prompt-patterns/index.d.ts",
@@ -11,6 +14,7 @@
     }
   },
   "files": [
+    "bin",
     "prompt-patterns",
     "README.md"
   ],
