@@ -120,6 +120,15 @@ arc-prompt recommend --format json --input-json '{
 
 The command only selects and explains prompt patterns. It does not execute tasks, call workers, providers, or networks, write project files, select routes or workloads, grant authorization, or infer execution-policy settings.
 
+## Orchestration integration guidance
+
+Package-owned guidance for ARC Pi parents lives in:
+
+- `skills/arc-orchestrator/SKILL.md` — when to request a read-only recommendation during local Analyze, how to apply primary pattern, overlays, fragments, lifecycle guidance, warnings, rationale, and confidence, and how to convert that advice into a bounded worker contract.
+- `prompts/orchestrate.md` — the same integration rules in prompt form for orchestration sessions.
+
+Recommendations remain descriptive parent-local advice. Workers receive a finalized bounded contract and never choose their own pattern, route, workload, or authorization.
+
 ## Development
 
 ```sh

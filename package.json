@@ -16,6 +16,8 @@
   "files": [
     "bin",
     "prompt-patterns",
+    "prompts",
+    "skills",
     "README.md"
   ],
   "scripts": {
