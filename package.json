@@ -2,6 +2,7 @@
   "name": "arc-skill-prompt-patterns",
   "version": "0.1.0",
   "description": "A dependency-free catalog and typed contract for descriptive prompt patterns.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "arc-prompt": "./bin/arc-prompt.mjs"
