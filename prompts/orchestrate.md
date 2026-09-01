@@ -45,6 +45,8 @@ Use the output only to draft the worker contract:
 
 Translate the recommendation into `arc_delegate` fields (`outcome`, `scope`, `preserved_behavior`, `verification`, `prohibitions`, `label`). Workers receive the finalized contract and must not re-run `recommend()` or choose routes, workload classes, models, or authorization.
 
+Worker `prohibitions` include no scope expansion, no commit or push unless explicitly authorized by the governing workflow, and no exposed internal deliberation.
+
 ARC phase routing, workload classification, Decision Ledger records, operator gates, Implement authorization, Verify, optional Code Review, and Deploy authorization remain authoritative outside this package.
 
 ## Quick examples

@@ -97,6 +97,15 @@ test("prompt mirrors integration guidance for orchestration parents", async () =
   }
 });
 
+test("prompt carries concrete worker-contract safety prohibitions", async () => {
+  const prompt = await read(promptPath);
+
+  assert.match(prompt, /Worker `prohibitions`/);
+  assert.match(prompt, /no scope expansion/i);
+  assert.match(prompt, /no commit or push unless explicitly authorized by the governing workflow/i);
+  assert.match(prompt, /no exposed internal deliberation/i);
+});
+
 test("guidance replaces deliberation exposure with evidence and verification", async () => {
   const sources = await Promise.all([read(skillPath), read(promptPath)]);
   const combined = sources.join("\n");
