@@ -5,6 +5,7 @@ import {
   AMBIGUITIES,
   ARC_PHASES,
   isValidOutput,
+  LOW_CONFIDENCE_THRESHOLD,
   OUTPUT_FIELDS,
   OUTPUT_SHAPES,
   recommend,
@@ -136,7 +137,121 @@ test("uses stable catalog order to break equal scores", () => {
 
   assert.equal(output.primaryPattern, "template-fill");
   assert.equal(output.overlays[0], "decomposition");
+  assert.deepEqual(output.needsOperator.reasons, ["tie"]);
+  assert.deepEqual(
+    output.needsOperator.alternatives,
+    ["template-fill", "decomposition", "critique", "boundary", "audience-adaptation"]
+  );
   assert.deepEqual(output, recommend(structuredClone(tied)));
+});
+
+test("returns an arc_ask_operator-ready decision for low confidence and combined ambiguity", () => {
+  assert.equal(LOW_CONFIDENCE_THRESHOLD, 0.6);
+  const lowConfidence = recommend(input({
+    taskType: "debugging",
+    arcPhase: "analyze",
+    reliabilityTier: "exploratory",
+    risk: "high",
+    target: { mode: "explicit", model: "unlisted-model" },
+    ambiguity: "high"
+  }));
+  const combined = recommend(input({
+    taskType: "extraction",
+    arcPhase: "explore",
+    reliabilityTier: "exploratory",
+    risk: "critical",
+    outputShape: "structured",
+    ambiguity: "high"
+  }));
+
+  assert.equal(lowConfidence.confidence < LOW_CONFIDENCE_THRESHOLD, true);
+  assert.deepEqual(lowConfidence.needsOperator.reasons, ["low-confidence"]);
+  assert.deepEqual(combined.needsOperator.reasons, ["tie", "low-confidence"]);
+
+  for (const output of [lowConfidence, combined]) {
+    const { alternatives, question } = output.needsOperator;
+    assert.equal(alternatives.length >= 2 && alternatives.length <= 5, true);
+    assert.equal(new Set(alternatives).size, alternatives.length);
+    assert.equal(alternatives.includes(output.primaryPattern), true);
+    assert.deepEqual(question.options.map(({ label }) => label), alternatives);
+    assert.deepEqual(Object.keys(question), [
+      "question",
+      "question_type",
+      "context",
+      "options",
+      "recommendation",
+      "blocking",
+      "semantic_key"
+    ]);
+    assert.equal(question.question_type, "single_select");
+    assert.equal(question.recommendation, output.primaryPattern);
+    assert.equal(question.blocking, true);
+    assert.match(question.semantic_key, /^prompt-pattern-selection:v1:[a-f0-9]{64}$/);
+    assert.equal(Object.getPrototypeOf(question.context), null);
+    for (const [key, value] of Object.entries(question.context)) {
+      assert.equal(key.trim().length > 0, true);
+      if (typeof value === "string") {
+        assert.equal(value.trim().length > 0, true);
+      } else {
+        assert.equal(Array.isArray(value) && value.length > 0, true);
+        assert.equal(value.every((part) => typeof part === "string" && part.trim().length > 0), true);
+      }
+    }
+  }
+});
+
+test("returns null for ordinary recommendations and stable model-neutral semantic keys", () => {
+  assert.equal(recommend(input()).needsOperator, null);
+
+  const tied = input({
+    taskType: "coding",
+    arcPhase: "implement",
+    risk: "low",
+    outputShape: "text",
+    ambiguity: "none"
+  });
+  const outputs = [
+    recommend({ ...tied, target: { mode: "automatic" } }),
+    recommend({ ...tied, target: { mode: "automatic", model: "sol" } }),
+    recommend({ ...tied, target: { mode: "automatic", model: "unlisted-model" } }),
+    recommend(structuredClone({ ...tied, target: { mode: "automatic" } }))
+  ];
+  const semanticKeys = outputs.map(({ needsOperator }) => needsOperator.question.semantic_key);
+
+  assert.equal(new Set(semanticKeys).size, 1);
+  assert.deepEqual(outputs[0], outputs[1]);
+  assert.deepEqual(outputs[0], outputs[2]);
+  assert.deepEqual(outputs[0], outputs[3]);
+});
+
+test("canonicalizes equivalent explicit targets to identical semantic keys", () => {
+  const tied = input({
+    taskType: "coding",
+    arcPhase: "implement",
+    risk: "low",
+    outputShape: "text",
+    ambiguity: "none"
+  });
+  const explicitTargets = [
+    { model: "sol" },
+    { mode: "explicit", model: "sol" },
+    { mode: "explicit", model: "SOL" },
+    { mode: "explicit", model: "gpt-5.6-sol" }
+  ];
+  const explicitKeys = explicitTargets.map(
+    (target) => recommend({ ...tied, target }).needsOperator.question.semantic_key
+  );
+  assert.equal(new Set(explicitKeys).size, 1);
+
+  const unknownTargets = [
+    { model: "custom-model" },
+    { mode: "explicit", model: "custom-model" },
+    { mode: "explicit", model: "  CUSTOM-MODEL  " }
+  ];
+  const unknownKeys = unknownTargets.map(
+    (target) => recommend({ ...tied, target }).needsOperator.question.semantic_key
+  );
+  assert.equal(new Set(unknownKeys).size, 1);
 });
 
 test("applies risk, reliability, ambiguity, shape, and phase guidance", () => {

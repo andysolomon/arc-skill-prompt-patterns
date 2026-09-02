@@ -104,6 +104,30 @@ test("renders deterministic JSON and human output with recommendation parity", (
   assert.match(human.stdout, /^Warnings:\n  - /m);
   assert.match(human.stdout, new RegExp(`^Rationale: ${expected.rationale.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
   assert.match(human.stdout, new RegExp(`^Confidence: ${expected.confidence}$`, "m"));
+  assert.match(human.stdout, /^Needs operator: no$/m);
+});
+
+test("renders the complete operator question in human output", () => {
+  const output = recommend({
+    taskType: "extraction",
+    arcPhase: "explore",
+    reliabilityTier: "exploratory",
+    risk: "critical",
+    target: { mode: "automatic" },
+    outputShape: "structured",
+    ambiguity: "high",
+    budget: {}
+  });
+  const rendered = renderHuman(output);
+
+  assert.match(rendered, /^Needs operator: yes$/m);
+  assert.match(rendered, /^Operator reasons:\n  - tie\n  - low-confidence$/m);
+  assert.match(rendered, /^Operator alternatives:\n  - template-fill/m);
+  assert.match(rendered, /^Question type: single_select$/m);
+  assert.match(rendered, /^Question context:\n  - action: Select one bounded pattern alternative before continuing\.\n  - reason: The top score is tied and recommendation confidence is below the package threshold\.$/m);
+  assert.match(rendered, /^Recommended option: template-fill$/m);
+  assert.match(rendered, /^Blocking: true$/m);
+  assert.match(rendered, /^Semantic key: prompt-pattern-selection:v1:[a-f0-9]{64}$/m);
 });
 
 test("has stable human formatting for empty lists", () => {

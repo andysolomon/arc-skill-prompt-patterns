@@ -19,6 +19,7 @@ export {
   isValidInput,
   isValidOutput,
   LIMITS,
+  LOW_CONFIDENCE_THRESHOLD,
   normalizeInput,
   normalizeOutput,
   OUTPUT_FIELDS,

@@ -2,6 +2,7 @@ import {
   ARC_PHASES,
   ContractValidationError,
   normalizeInput,
+  normalizeOutput,
   PATTERN_IDS,
   RELIABILITY_TIERS,
   TARGET_MODES,
@@ -16,7 +17,8 @@ export const EXPECTED_FIELDS = Object.freeze([
   "primaryPattern",
   "overlays",
   "warnings",
-  "confidence"
+  "confidence",
+  "needsOperator"
 ]);
 
 export const REQUIRED_SOURCE_TASK_TYPES = Object.freeze([...TASK_TYPES]);
@@ -219,14 +221,41 @@ const checkExpected = (value, path, issues) => {
     addIssue(issues, `${path}.confidence`, "confidence", "Expected a finite number from 0 to 1.");
   }
 
-  if (!primaryValid || !overlaysArray || !warningsArray || !confidenceValid) {
+  const needsOperator = readData(descriptors, "needsOperator");
+  let normalizedNeedsOperator;
+  if (needsOperator.readable) {
+    try {
+      normalizedNeedsOperator = normalizeOutput({
+        primaryPattern: primary.value,
+        overlays,
+        promptFragments: [],
+        lifecycleGuidance: [],
+        warnings,
+        rationale: "Fixture recommendation expectation.",
+        confidence: confidence.value,
+        needsOperator: needsOperator.value
+      }).needsOperator;
+    } catch (error) {
+      if (!(error instanceof ContractValidationError)) {
+        throw error;
+      }
+      for (const issue of error.issues) {
+        if (issue.path.startsWith("$.needsOperator")) {
+          addIssue(issues, `${path}${issue.path.slice(1)}`, issue.code, issue.message);
+        }
+      }
+    }
+  }
+
+  if (!primaryValid || !overlaysArray || !warningsArray || !confidenceValid || !needsOperator.readable) {
     return undefined;
   }
   return {
     primaryPattern: primary.value,
     overlays,
     warnings,
-    confidence: confidence.value
+    confidence: confidence.value,
+    needsOperator: normalizedNeedsOperator
   };
 };
 

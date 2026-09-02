@@ -163,6 +163,39 @@ export function renderJson(recommendation) {
 const renderEntries = (entries, renderEntry) =>
   entries.length === 0 ? "  (none)" : entries.map((entry) => `  - ${renderEntry(entry)}`).join("\n");
 
+const renderContextEntries = (context) =>
+  Object.keys(context)
+    .sort((left, right) => left.localeCompare(right))
+    .map((key) => {
+      const value = context[key];
+      const rendered = Array.isArray(value) ? value.join(" · ") : value;
+      return `  - ${key}: ${rendered}`;
+    })
+    .join("\n");
+
+const renderNeedsOperator = (needsOperator) => {
+  if (needsOperator === null) {
+    return ["Needs operator: no"];
+  }
+  const { question } = needsOperator;
+  return [
+    "Needs operator: yes",
+    "Operator reasons:",
+    renderEntries(needsOperator.reasons, (reason) => reason),
+    "Operator alternatives:",
+    renderEntries(needsOperator.alternatives, (alternative) => alternative),
+    `Operator question: ${question.question}`,
+    `Question type: ${question.question_type}`,
+    "Question context:",
+    renderContextEntries(question.context),
+    "Question options:",
+    renderEntries(question.options, ({ label, description }) => `${label}: ${description}`),
+    `Recommended option: ${question.recommendation}`,
+    `Blocking: ${question.blocking}`,
+    `Semantic key: ${question.semantic_key}`
+  ];
+};
+
 export function renderHuman(recommendation) {
   return [
     `Primary pattern: ${recommendation.primaryPattern}`,
@@ -176,6 +209,7 @@ export function renderHuman(recommendation) {
     renderEntries(recommendation.warnings, (warning) => warning),
     `Rationale: ${recommendation.rationale}`,
     `Confidence: ${recommendation.confidence}`,
+    ...renderNeedsOperator(recommendation.needsOperator),
     ""
   ].join("\n");
 }

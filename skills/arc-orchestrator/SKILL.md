@@ -61,6 +61,18 @@ Treat the output as drafting guidance for the worker contract—not executable p
 | `warnings` | Carry forward as contract caveats or parent acceptance notes |
 | `rationale` | Use as a concise contract preamble; never paste hidden reasoning or chain-of-thought |
 | `confidence` | Inform whether to tighten verification or ask the operator before delegating |
+| `needsOperator` | Resolve a tied or below-0.60 pattern selection through the Decision Ledger/operator flow below; `null` needs no pattern-selection gate |
+
+## Resolve a pattern-selection decision
+
+When `needsOperator` is non-null, treat it as a blocking prompt-pattern choice, not as execution authorization:
+
+1. Query `arc_decisions` with `needsOperator.question.semantic_key`.
+2. Reuse the choice only when there is exactly one effective valid answer and its label remains in `needsOperator.alternatives`.
+3. If there is no single effective valid answer, pass `needsOperator.question` directly to `arc_ask_operator`. It is already one bounded `single_select` question with context, 2–5 unique labeled options, a named recommendation, `blocking: true`, and the stable semantic key.
+4. Apply the selected `PatternId` as the primary drafting pattern while retaining the returned overlays and guidance where compatible.
+
+Never infer a choice from an unresolved or cancelled question. Recording or reusing a pattern choice resolves only this prompt-pattern ambiguity; recorded, reused, unresolved, and cancelled decisions never grant Implement authorization or Deploy authorization.
 
 ## Reliability tiers and acceptance guidance
 
@@ -76,7 +88,7 @@ Fold the tier fragment into `verification`, and raise the worker's evidence bar 
 
 **High-assurance fails closed.** When `ambiguity` is `medium` or `high`, or a non-automatic target (explicit or model-only) has no `model` or resolves to an unverified profile, `warnings` carries a fail-closed entry naming the unresolved assumptions and the required operator decisions. Treat it as an acceptance blocker in the contract: the parent resolves it, or the operator decides, before the result is relied on.
 
-These tiers prescribe result structure, evidence, and acceptance expectations only. ARC Pi still owns Decision Ledger records, Implement authorization, running independent Verify, choosing optional Code Review, and separate Deploy authorization.
+These tiers prescribe result structure, evidence, and acceptance expectations only. ARC Pi still owns Decision Ledger records, operator questions, Implement authorization, running independent Verify, choosing optional Code Review, and separate Deploy authorization.
 
 **Replace internal deliberation:** Do not ask workers to expose private reasoning, scratch work, or chain-of-thought. Require concise rationale, cited evidence, tests run, and verification artifacts in the worker return contract instead.
 

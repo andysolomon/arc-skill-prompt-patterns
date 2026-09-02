@@ -1,5 +1,12 @@
-import { PATTERN_IDS } from "./catalog.mjs";
-import { normalizeInput, normalizeOutput } from "./contract.mjs";
+import { createHash } from "node:crypto";
+
+import { PATTERN_CATALOG_BY_ID, PATTERN_IDS } from "./catalog.mjs";
+import {
+  CONTRACT_LIMITS,
+  LOW_CONFIDENCE_THRESHOLD,
+  normalizeInput,
+  normalizeOutput
+} from "./contract.mjs";
 import { resolveModelProfile, UNKNOWN_MODEL_PROFILE } from "./profiles.mjs";
 
 const freezeRecord = (value) =>
@@ -262,6 +269,81 @@ const rationaleFor = (input, primaryPattern, overlays) => {
   return `${primaryPattern} has the strongest deterministic fit for ${input.taskType} during the ${input.arcPhase} phase, with ${input.reliabilityTier} reliability, ${input.risk} risk, ${input.outputShape} output, and ${input.ambiguity} ambiguity.${overlayText}`;
 };
 
+const canonicalTargetForSemanticKey = (target) => {
+  if (target.mode === "automatic") {
+    return { mode: "automatic" };
+  }
+
+  const canonical = { mode: "explicit" };
+  if (target.model !== undefined) {
+    const profile = resolveModelProfile(target.model);
+    canonical.model = profile === UNKNOWN_MODEL_PROFILE
+      ? target.model.trim().toLocaleLowerCase("en-US")
+      : profile.id;
+  }
+  return canonical;
+};
+
+const semanticInputFor = (input) => ({
+  taskType: input.taskType,
+  arcPhase: input.arcPhase,
+  reliabilityTier: input.reliabilityTier,
+  risk: input.risk,
+  target: canonicalTargetForSemanticKey(input.target),
+  outputShape: input.outputShape,
+  ambiguity: input.ambiguity,
+  budget: { ...input.budget }
+});
+
+const semanticKeyFor = (input) => {
+  const digest = createHash("sha256")
+    .update(JSON.stringify(semanticInputFor(input)))
+    .digest("hex");
+  return `prompt-pattern-selection:v1:${digest}`;
+};
+
+const needsOperatorFor = (input, ranked, confidence) => {
+  const reasons = [];
+  if (ranked[1]?.score === ranked[0].score) {
+    reasons.push("tie");
+  }
+  if (confidence < LOW_CONFIDENCE_THRESHOLD) {
+    reasons.push("low-confidence");
+  }
+  if (reasons.length === 0) {
+    return null;
+  }
+
+  const alternatives = ranked
+    .slice(0, CONTRACT_LIMITS.maxOperatorAlternatives)
+    .map(({ id }) => id);
+  const reasonText = reasons.length === 2
+    ? "The top score is tied and recommendation confidence is below the package threshold."
+    : reasons[0] === "tie"
+      ? "The top recommendation score is tied."
+      : "Recommendation confidence is below the package threshold.";
+
+  return {
+    reasons,
+    alternatives,
+    question: {
+      question: "Which prompt pattern should be primary for this task?",
+      question_type: "single_select",
+      context: {
+        reason: reasonText,
+        action: "Select one bounded pattern alternative before continuing."
+      },
+      options: alternatives.map((id) => ({
+        label: id,
+        description: PATTERN_CATALOG_BY_ID[id].description
+      })),
+      recommendation: ranked[0].id,
+      blocking: true,
+      semantic_key: semanticKeyFor(input)
+    }
+  };
+};
+
 /**
  * Return a deterministic, descriptive prompt-pattern recommendation.
  * Input normalization supplies isolation; output normalization validates and
@@ -310,6 +392,10 @@ export function recommend(input) {
     ...budget.warnings,
     ...capability.warnings
   ];
+  const confidence = confidenceFor(
+    normalized,
+    budget.confidenceDelta + capability.confidenceDelta
+  );
 
   return normalizeOutput({
     primaryPattern,
@@ -318,6 +404,7 @@ export function recommend(input) {
     lifecycleGuidance,
     warnings,
     rationale: rationaleFor(normalized, primaryPattern, overlays),
-    confidence: confidenceFor(normalized, budget.confidenceDelta + capability.confidenceDelta)
+    confidence,
+    needsOperator: needsOperatorFor(normalized, ranked, confidence)
   });
 }

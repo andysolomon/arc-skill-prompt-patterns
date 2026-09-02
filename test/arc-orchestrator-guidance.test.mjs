@@ -27,7 +27,8 @@ const requiredFields = [
   "lifecycleGuidance",
   "warnings",
   "rationale",
-  "confidence"
+  "confidence",
+  "needsOperator"
 ];
 
 const exampleMarkers = [
@@ -135,6 +136,19 @@ test("guidance keeps recommendations execution-neutral", async () => {
   assert.doesNotMatch(combined, /recommend\(\)\s+(?:grants?|sets?|requires?)\s+authorization/i);
   assert.doesNotMatch(combined, /set `route`/i);
   assert.doesNotMatch(combined, /workers must select routes/i);
+});
+
+test("guidance documents the bounded Decision Ledger and operator-question flow", async () => {
+  const sources = await Promise.all([read(skillPath), read(promptPath), read(readmePath)]);
+  const combined = sources.join("\n");
+
+  assert.match(combined, /`needsOperator`/);
+  assert.match(combined, /`arc_decisions`/);
+  assert.match(combined, /`arc_ask_operator`/);
+  assert.match(combined, /exactly one effective valid answer/i);
+  assert.match(combined, /pass `needsOperator\.question` directly/i);
+  assert.match(combined, /unresolved or cancelled/i);
+  assert.match(combined, /never grant Implement authorization or Deploy authorization/i);
 });
 
 const documentedHighAssuranceInput = {
