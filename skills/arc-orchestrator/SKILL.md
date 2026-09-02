@@ -62,6 +62,22 @@ Treat the output as drafting guidance for the worker contract—not executable p
 | `rationale` | Use as a concise contract preamble; never paste hidden reasoning or chain-of-thought |
 | `confidence` | Inform whether to tighten verification or ask the operator before delegating |
 
+## Reliability tiers and acceptance guidance
+
+`reliabilityTier` selects a deterministic acceptance fragment (`kind: "verification"`) that gets stricter with each tier:
+
+| Tier | Result structure | Evidence | Focused tests | Independent Verify | Independent Code Review |
+| --- | --- | --- | --- | --- | --- |
+| `exploratory` | Result plus the open questions it still depends on | Unverified claims labeled provisional | One focused check that would confirm or refute the result | Optional at the parent's discretion | Not expected unless the parent requests it |
+| `standard` | Complete requested structure with material assumptions stated | Evidence cited for each material claim | Focused tests or checks run, with observed outcomes reported | Expected before the result is accepted | Optional at the parent's discretion |
+| `high-assurance` | Every required field, with assumptions, edge cases, and residual uncertainty named | Verifiable evidence for every material claim | Focused tests with exact commands and observed results | Expected before the result is relied on | Recommended option |
+
+Fold the tier fragment into `verification`, and raise the worker's evidence bar to match. High-assurance also adds a `verify` entry to `lifecycleGuidance`.
+
+**High-assurance fails closed.** When `ambiguity` is `medium` or `high`, or a non-automatic target (explicit or model-only) has no `model` or resolves to an unverified profile, `warnings` carries a fail-closed entry naming the unresolved assumptions and the required operator decisions. Treat it as an acceptance blocker in the contract: the parent resolves it, or the operator decides, before the result is relied on.
+
+These tiers prescribe result structure, evidence, and acceptance expectations only. ARC Pi still owns Decision Ledger records, Implement authorization, running independent Verify, choosing optional Code Review, and separate Deploy authorization.
+
 **Replace internal deliberation:** Do not ask workers to expose private reasoning, scratch work, or chain-of-thought. Require concise rationale, cited evidence, tests run, and verification artifacts in the worker return contract instead.
 
 ## Convert recommendation to worker contract

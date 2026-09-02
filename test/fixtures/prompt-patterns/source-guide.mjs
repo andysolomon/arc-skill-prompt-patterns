@@ -55,7 +55,9 @@ export const SOURCE_GUIDE_FIXTURES = [
     expected: {
       primaryPattern: "evidence-grounding",
       overlays: ["boundary", "decomposition", "guardrail"],
-      warnings: [],
+      warnings: [
+        "High-assurance acceptance fails closed: resolve the unresolved assumptions that could change the result, and name each unresolved assumption or required operator decision before relying on this result."
+      ],
       confidence: 0.73
     }
   },
@@ -168,7 +170,8 @@ export const SOURCE_GUIDE_FIXTURES = [
       overlays: ["boundary", "critique", "template-fill"],
       warnings: [
         "High ambiguity lowers confidence; resolve outcome-changing assumptions before relying on the result.",
-        "Critical risk requires independent review and explicit checks outside this descriptive recommendation."
+        "Critical risk requires independent review and explicit checks outside this descriptive recommendation.",
+        "High-assurance acceptance fails closed: resolve the unresolved assumptions that could change the result, and name each unresolved assumption or required operator decision before relying on this result."
       ],
       confidence: 0.61
     }

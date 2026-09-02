@@ -39,6 +39,18 @@ Use the output only to draft the worker contract:
 - `rationale` becomes a concise preamble—never hidden reasoning or chain-of-thought
 - `confidence` informs whether to tighten verification or ask the operator before delegating
 
+## Reliability tiers
+
+`reliabilityTier` produces a deterministic acceptance fragment that tightens result structure, evidence, focused tests, independent Verify, and optional independent Code Review with each tier:
+
+- `exploratory` — result plus its open questions; unverified claims labeled provisional; one focused check named; independent Verify optional; independent Code Review not expected unless you request it.
+- `standard` — complete requested structure with assumptions stated; evidence cited for each material claim; focused tests run with observed outcomes; independent Verify expected before acceptance; independent Code Review optional.
+- `high-assurance` — every required field with assumptions, edge cases, and residual uncertainty named; verifiable evidence for every material claim; focused tests with exact commands and observed results; independent Verify expected before reliance; independent Code Review a recommended option.
+
+**High-assurance fails closed.** With `medium`/`high` ambiguity, or a non-automatic target (explicit or model-only) that has no `model` or an unverified profile, `warnings` names the unresolved assumptions and required operator decisions. Carry it into the contract as an acceptance blocker and resolve it with the operator before relying on the result.
+
+Tiers prescribe evidence and acceptance expectations only. Decision Ledger records, Implement authorization, running independent Verify, choosing optional Code Review, and Deploy authorization stay outside this package.
+
 **Replace internal deliberation:** never ask workers to expose private reasoning, scratch work, or chain-of-thought. Require concise rationale, cited evidence, tests run, and verification artifacts instead.
 
 ## Worker contract

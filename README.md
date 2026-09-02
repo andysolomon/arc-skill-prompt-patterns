@@ -63,6 +63,22 @@ const recommendation = recommend({
 
 The pure rule engine considers every input dimension. It selects a primary from the fixed catalog, ranks compatible overlays, and supplies prompt fragments, phase guidance, warnings, rationale, and confidence. Equal scores use catalog order as a stable tie-break. Tight token or latency budgets reduce optional guidance and add descriptive warnings; they do not trigger any external behavior.
 
+### Reliability tiers
+
+`reliabilityTier` selects one deterministic acceptance fragment (`kind: "verification"`) that becomes stricter with each tier:
+
+| Tier | Result structure | Evidence | Focused tests | Independent Verify | Independent Code Review |
+| --- | --- | --- | --- | --- | --- |
+| `exploratory` | Result plus the open questions it still depends on | Unverified claims labeled provisional | One focused check that would confirm or refute the result | Optional at the parent's discretion | Not expected unless the parent requests it |
+| `standard` | Complete requested structure with material assumptions stated | Evidence cited for each material claim | Focused tests or checks run, with observed outcomes reported | Expected before the result is accepted | Optional at the parent's discretion |
+| `high-assurance` | Every required field, with assumptions, edge cases, and residual uncertainty named | Verifiable evidence for every material claim | Focused tests with exact commands and observed results | Expected before the result is relied on | Recommended option |
+
+The fragment is emitted early so tight budgets cannot truncate it. High-assurance additionally keeps a `verify` entry in `lifecycleGuidance`.
+
+High-assurance fails closed: when `ambiguity` is `medium` or `high`, or a non-automatic target (explicit or model-only) supplies no `model` or resolves to an unverified profile, `warnings` includes an entry naming the unresolved assumptions and the required operator decisions to settle before the result is relied on. Lower tiers never emit that warning.
+
+These tiers describe result structure, evidence, and acceptance expectations. They do not run Verify or Code Review, change confidence, or affect Decision Ledger records, Implement authorization, or Deploy authorization.
+
 In `automatic` target mode, an optional model hint is deliberately ignored, so identical task inputs remain model-neutral. In explicit or model-only targets, known profiles can add capability guidance for schema output, tool-use shapes, or reasoning controls. Unknown profiles use conservative warnings. These adjustments describe prompting only and never choose a model or authorize an action.
 
 Calls are deterministic for equivalent data, do not mutate input values, and return fresh deeply frozen output copies. Invalid inputs raise `ContractValidationError` through the same strict normalization API used by the public contract.
