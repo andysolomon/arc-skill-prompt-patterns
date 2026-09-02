@@ -1,0 +1,19 @@
+W-000021 - Reliability Tier Verification Guidance - Progress
+Generated: 2026-09-02 10:51:39 EDT
+On completion, move this file and the plan to docs/archive/.
+
+[x] 1.0 - Deterministic reliability guidance
+    [x] 1.1 - Add tier-specific structure, evidence, and focused-test guidance
+    [x] 1.2 - Add independent Verify and optional Code Review guidance
+    [x] 1.3 - Add fail-closed high-assurance uncertainty warnings
+[x] 2.0 - Tier matrix and authority tests
+    [x] 2.1 - Add exploratory, standard, and high-assurance matrix assertions
+    [x] 2.2 - Add missing-evidence and unresolved-assumption fixtures
+    [x] 2.3 - Prove recommendation remains parent-local and non-authorizing
+[x] 3.0 - Parent guidance and verification
+    [x] 3.1 - Update README, ARC skill, and orchestration prompt
+    [x] 3.2 - Run focused checks, full test suite, and scope inspection
+    [x] 3.3 - Repair: model-only targets fail closed like explicit targets (tier-guidance-repair)
+[ ] 4.0 - Ship and archive
+    [x] 4.1 - Open shipping PR for review
+    [ ] 4.2 - On merge: move docs/W-000021-IMPLEMENTATION_PLAN.md + docs/W-000021-progress.txt to docs/archive/

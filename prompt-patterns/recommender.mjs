@@ -91,6 +91,42 @@ const OUTPUT_INSTRUCTIONS = Object.freeze({
   mixed: "Clearly separate structured data, code, and explanatory prose."
 });
 
+// Reliability tiers map to increasingly strict acceptance guidance: result
+// structure, evidence, focused tests, independent Verify, and optional
+// independent Code Review. The text is descriptive only. It states what a result
+// must contain and which independent checks a parent should expect; it never
+// launches Verify or Code Review and never grants authorization.
+const RELIABILITY_TIER_GUIDANCE = Object.freeze({
+  exploratory:
+    "Exploratory acceptance: return the requested result together with the open questions it still depends on, " +
+    "label unverified claims as provisional evidence, name one focused check that would confirm or refute the result, " +
+    "treat independent Verify as optional at the parent's discretion, " +
+    "and treat independent Code Review as unnecessary unless the parent requests it.",
+  standard:
+    "Standard acceptance: return the complete requested structure with material assumptions stated, " +
+    "cite the evidence supporting each material claim, " +
+    "report the focused tests or checks that were run and their observed outcomes, " +
+    "expect independent Verify before the result is accepted, " +
+    "and treat independent Code Review as optional at the parent's discretion.",
+  "high-assurance":
+    "High-assurance acceptance: return every required field of the requested structure with assumptions, " +
+    "edge cases, and residual uncertainty named, cite verifiable evidence for every material claim, " +
+    "report focused tests with exact commands and observed results, " +
+    "expect independent Verify before the result is relied on and independent Code Review as a recommended option, " +
+    "and withhold acceptance while material uncertainty remains unresolved."
+});
+
+// High-assurance fails closed: when uncertainty or model capability evidence is
+// unresolved for an explicit or model-only target, the recommendation names what a
+// parent or operator must settle instead of implying the result is already
+// acceptable. Automatic targets stay model-neutral and never fail closed on model
+// evidence.
+const HIGH_ASSURANCE_UNRESOLVED = Object.freeze({
+  assumptions: "the unresolved assumptions that could change the result",
+  missingModel: "the missing capability evidence for the model target",
+  unverifiedModel: "the unverified capability evidence for the model target"
+});
+
 const applyRules = (scores, rules) => {
   for (const [id, weight] of rules) {
     scores.set(id, scores.get(id) + weight);
@@ -185,6 +221,34 @@ const budgetAdjustment = (input) => {
   return { warnings, overlayLimit, fragmentLimit, confidenceDelta };
 };
 
+const highAssuranceGate = (input) => {
+  if (input.reliabilityTier !== "high-assurance") {
+    return [];
+  }
+
+  const unresolved = [];
+  if (input.ambiguity === "medium" || input.ambiguity === "high") {
+    unresolved.push(HIGH_ASSURANCE_UNRESOLVED.assumptions);
+  }
+  // Explicit and model-only targets must resolve to verified capability evidence;
+  // automatic targets deliberately ignore the model hint and stay model-neutral.
+  if (input.target.mode !== "automatic") {
+    if (input.target.model === undefined) {
+      unresolved.push(HIGH_ASSURANCE_UNRESOLVED.missingModel);
+    } else if (resolveModelProfile(input.target.model) === UNKNOWN_MODEL_PROFILE) {
+      unresolved.push(HIGH_ASSURANCE_UNRESOLVED.unverifiedModel);
+    }
+  }
+  if (unresolved.length === 0) {
+    return [];
+  }
+
+  return [
+    `High-assurance acceptance fails closed: resolve ${unresolved.join(" and ")}, ` +
+      "and name each unresolved assumption or required operator decision before relying on this result."
+  ];
+};
+
 const confidenceFor = (input, deltas) => {
   const ambiguityDelta = { none: 0.06, low: 0.02, medium: -0.05, high: -0.12 }[input.ambiguity];
   const reliabilityDelta = { exploratory: -0.03, standard: 0, "high-assurance": 0.04 }[input.reliabilityTier];
@@ -217,14 +281,13 @@ export function recommend(input) {
   const promptFragments = [
     { kind: "instruction", text: PRIMARY_INSTRUCTIONS[primaryPattern] },
     { kind: "format", text: OUTPUT_INSTRUCTIONS[normalized.outputShape] },
+    // Placed early so tight budgets keep the tier's acceptance requirements.
+    { kind: "verification", text: RELIABILITY_TIER_GUIDANCE[normalized.reliabilityTier] },
     ...(normalized.ambiguity === "medium" || normalized.ambiguity === "high"
       ? [{ kind: "context", text: "State material assumptions and isolate questions whose answers could change the result." }]
       : []),
     ...(normalized.risk === "high" || normalized.risk === "critical"
       ? [{ kind: "constraint", text: "Do not exceed the stated scope; flag unsafe or irreversible implications for independent review." }]
-      : []),
-    ...(normalized.reliabilityTier === "high-assurance"
-      ? [{ kind: "verification", text: "Check the final result against requirements, evidence, edge cases, and stated constraints." }]
       : []),
     ...capability.fragments
   ].slice(0, budget.fragmentLimit);
@@ -243,6 +306,7 @@ export function recommend(input) {
     ...(normalized.risk === "critical"
       ? ["Critical risk requires independent review and explicit checks outside this descriptive recommendation."]
       : []),
+    ...highAssuranceGate(normalized),
     ...budget.warnings,
     ...capability.warnings
   ];

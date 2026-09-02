@@ -156,6 +156,79 @@ test("documented high-assurance recommendation matches recommender output", () =
   assert.equal(output.confidence, 0.75);
 });
 
+const readmePath = new URL("../README.md", import.meta.url);
+
+const tierAcceptanceDimensions = [
+  /result structure/i,
+  /evidence/i,
+  /focused (?:tests|check)/i,
+  /independent Verify/i,
+  /independent Code Review/i
+];
+
+test("guidance documents the reliability-tier acceptance matrix", async () => {
+  const sources = await Promise.all([read(skillPath), read(promptPath), read(readmePath)]);
+
+  for (const source of sources) {
+    for (const tier of ["exploratory", "standard", "high-assurance"]) {
+      assert.match(source, new RegExp(`\`${tier}\``), tier);
+    }
+    for (const dimension of tierAcceptanceDimensions) {
+      assert.match(source, dimension, String(dimension));
+    }
+    assert.match(source, /fails closed/i);
+    assert.match(source, /unresolved assumptions/i);
+    assert.match(source, /operator decisions/i);
+  }
+});
+
+test("documented tier guidance matches recommender behavior and keeps ARC authority", async () => {
+  const sources = await Promise.all([read(skillPath), read(promptPath), read(readmePath)]);
+  const combined = sources.join("\n");
+
+  for (const pattern of [/Decision Ledger/i, /Implement authorization/i, /Deploy authorization/i, /optional Code Review|Code Review optional|independent Code Review/i]) {
+    assert.match(combined, pattern, String(pattern));
+  }
+
+  const tierInput = (overrides) => ({
+    taskType: "coding",
+    arcPhase: "analyze",
+    reliabilityTier: "standard",
+    risk: "medium",
+    target: { mode: "automatic" },
+    outputShape: "code",
+    ambiguity: "low",
+    budget: {},
+    ...overrides
+  });
+
+  const acceptance = {
+    exploratory: "Exploratory acceptance:",
+    standard: "Standard acceptance:",
+    "high-assurance": "High-assurance acceptance:"
+  };
+  for (const [reliabilityTier, marker] of Object.entries(acceptance)) {
+    const output = recommend(tierInput({ reliabilityTier }));
+    assert.equal(
+      output.promptFragments.some(({ kind, text }) => kind === "verification" && text.startsWith(marker)),
+      true,
+      reliabilityTier
+    );
+    assert.equal(output.warnings.some((warning) => warning.startsWith("High-assurance acceptance fails closed:")), false, reliabilityTier);
+  }
+
+  const uncertain = recommend(tierInput({ reliabilityTier: "high-assurance", ambiguity: "medium" }));
+  const missingEvidence = recommend(tierInput({
+    reliabilityTier: "high-assurance",
+    target: { mode: "explicit" }
+  }));
+  assert.equal(uncertain.warnings.some((warning) => warning.includes("unresolved assumptions")), true);
+  assert.equal(
+    missingEvidence.warnings.some((warning) => warning.includes("missing capability evidence")),
+    true
+  );
+});
+
 test("examples document Analyze-time inputs with later delegation phases", async () => {
   const skill = await read(skillPath);
   const prompt = await read(promptPath);

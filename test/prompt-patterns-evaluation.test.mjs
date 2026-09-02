@@ -89,6 +89,41 @@ test("matches every literal expected recommendation deterministically", () => {
   assert.equal(evaluated, FIXTURE_COUNT);
 });
 
+const TIER_ACCEPTANCE_MARKERS = {
+  exploratory: "Exploratory acceptance:",
+  standard: "Standard acceptance:",
+  "high-assurance": "High-assurance acceptance:"
+};
+
+test("gives every fixture tier-specific acceptance guidance and fail-closed warnings", () => {
+  const coveredTiers = new Set();
+  let failClosed = 0;
+
+  for (const fixture of FIXTURES) {
+    const { reliabilityTier, ambiguity, target } = fixture.input;
+    const output = recommend(fixture.input);
+    const fragment = output.promptFragments.find(({ kind, text }) =>
+      kind === "verification" && text.startsWith(TIER_ACCEPTANCE_MARKERS[reliabilityTier]));
+
+    assert.notEqual(fragment, undefined, `${fixture.id}: missing ${reliabilityTier} acceptance guidance`);
+    coveredTiers.add(reliabilityTier);
+
+    const expectsFailClosed =
+      reliabilityTier === "high-assurance" &&
+      (ambiguity === "medium" || ambiguity === "high" || target.mode === "explicit" && target.model === undefined);
+    const actual = output.warnings.some((warning) =>
+      warning.startsWith("High-assurance acceptance fails closed:"));
+
+    assert.equal(actual, expectsFailClosed, fixture.id);
+    if (actual) {
+      failClosed += 1;
+    }
+  }
+
+  assert.deepEqual([...coveredTiers].sort(), ["exploratory", "high-assurance", "standard"]);
+  assert.equal(failClosed, 3);
+});
+
 test("keeps evaluation offline and recommendations execution-neutral", () => {
   for (const fixture of FIXTURES) {
     const output = recommend(fixture.input);

@@ -101,7 +101,8 @@ export const ARC_LIFECYCLE_FIXTURES = [
       primaryPattern: "critique",
       overlays: ["boundary", "guardrail", "evidence-grounding"],
       warnings: [
-        "Critical risk requires independent review and explicit checks outside this descriptive recommendation."
+        "Critical risk requires independent review and explicit checks outside this descriptive recommendation.",
+        "High-assurance acceptance fails closed: resolve the unresolved assumptions that could change the result, and name each unresolved assumption or required operator decision before relying on this result."
       ],
       confidence: 0.68
     }
