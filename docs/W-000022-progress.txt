@@ -1,0 +1,38 @@
+W-000022 - Ambiguous Prompt-pattern Recommendations - Progress
+Generated: 2026-09-02 12:41:01 EDT
+On completion, move this file and the plan to docs/archive/.
+
+[x] 1.0 - Canonical ambiguity contract
+    [x] 1.1 - Add strict/deep-frozen needsOperator output and threshold export
+    [x] 1.2 - Update JSON schema metadata and TypeScript declarations
+    [x] 1.3 - Add relationship, bound, accessor, and immutability tests
+[x] 2.0 - Deterministic ambiguity generation
+    [x] 2.1 - Detect exact top-score ties and confidence below 0.60
+    [x] 2.2 - Return 2-5 ranked pattern alternatives and an arc_ask_operator-ready question
+    [x] 2.3 - Derive stable automatic-model-neutral semantic keys
+[x] 3.0 - Fixtures, guidance, and package verification
+    [x] 3.1 - Add tie, low-confidence, combined, and ordinary fixtures/tests
+    [x] 3.2 - Update README, package orchestration skill, prompt, and CLI coverage
+    [x] 3.3 - Run npm test and git diff --check
+[ ] 4.0 - Ship package PR
+    [x] 4.1 - Open the PR with Closes #9 coordination context
+    [ ] 4.2 - After merge, provide the merge commit for the ARC Pi dependency pin
+    [ ] 4.3 - On full story completion, move docs/W-000022-IMPLEMENTATION_PLAN.md + docs/W-000022-progress.txt to docs/archive/
+
+Implementation evidence (2026-09-02):
+- Focused ambiguity, schema, fixture, CLI, and guidance tests passed (5 files).
+- Full `npm test` passed (7 files).
+- `git diff --check` passed.
+- PR, merge, dependency pin, and archive steps remain intentionally deferred.
+
+Context-repair evidence (2026-09-02):
+- Replaced needsOperator.question.context string with structured {reason, action} object.
+- Validator, schema, normalizer, CLI renderer, fixtures, and regression tests aligned to ARC Pi ClarificationContext.
+- Focused package tests, full npm test, git diff --check, and ARC Pi compatibility probe pending worker verification.
+
+Strictness-repair evidence (2026-09-02):
+- copyClarificationContext now uses Object.create(null) plus defineProperty so __proto__ survives as own data.
+- copyOwnDataProperty uses defineProperty instead of bracket assignment.
+- semanticInputFor canonicalizes explicit/model-only targets via resolveModelProfile before hashing.
+- Regression tests cover __proto__ preservation, null-prototype context, equivalent semantic keys, and accessor fail-closed.
+- source-guide-planning fixture semantic_key updated after sol canonicalizes to gpt-5.6-sol.

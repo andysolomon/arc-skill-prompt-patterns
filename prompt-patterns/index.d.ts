@@ -64,6 +64,33 @@ export interface LifecycleGuidance {
   readonly guidance: string;
 }
 
+export type NeedsOperatorReason = "tie" | "low-confidence";
+
+export interface OperatorQuestionOption {
+  readonly label: PatternId;
+  readonly description: string;
+}
+
+export type OperatorQuestionContextValue = string | readonly string[];
+
+export type OperatorQuestionContext = Readonly<Record<string, OperatorQuestionContextValue>>;
+
+export interface OperatorQuestion {
+  readonly question: string;
+  readonly question_type: "single_select";
+  readonly context: OperatorQuestionContext;
+  readonly options: readonly OperatorQuestionOption[];
+  readonly recommendation: PatternId;
+  readonly blocking: true;
+  readonly semantic_key: string;
+}
+
+export interface NeedsOperatorRecommendation {
+  readonly reasons: readonly NeedsOperatorReason[];
+  readonly alternatives: readonly PatternId[];
+  readonly question: OperatorQuestion;
+}
+
 export interface PromptPatternOutput {
   readonly primaryPattern: PatternId;
   readonly overlays: readonly PatternId[];
@@ -72,6 +99,7 @@ export interface PromptPatternOutput {
   readonly warnings: readonly string[];
   readonly rationale: string;
   readonly confidence: number;
+  readonly needsOperator: NeedsOperatorRecommendation | null;
 }
 
 export interface ValidationIssue {
@@ -141,6 +169,7 @@ export const RISKS: readonly Risk[];
 export const TARGET_MODES: readonly TargetMode[];
 export const OUTPUT_SHAPES: readonly OutputShape[];
 export const AMBIGUITIES: readonly Ambiguity[];
+export const LOW_CONFIDENCE_THRESHOLD: 0.6;
 export const PROMPT_FRAGMENT_KINDS: readonly PromptFragmentKind[];
 export const INPUT_FIELDS: readonly [
   "taskType",
@@ -159,7 +188,8 @@ export const OUTPUT_FIELDS: readonly [
   "lifecycleGuidance",
   "warnings",
   "rationale",
-  "confidence"
+  "confidence",
+  "needsOperator"
 ];
 
 export const CONTRACT_LIMITS: Readonly<{
@@ -168,6 +198,11 @@ export const CONTRACT_LIMITS: Readonly<{
   maxLifecycleGuidanceEntries: 16;
   maxLifecycleGuidanceLength: 1000;
   maxRationaleLength: 2000;
+  minOperatorAlternatives: 2;
+  maxOperatorAlternatives: 5;
+  maxOperatorQuestionLength: 500;
+  maxOperatorContextLength: 1000;
+  maxOperatorOptionDescriptionLength: 1000;
 }>;
 export const LIMITS: typeof CONTRACT_LIMITS;
 

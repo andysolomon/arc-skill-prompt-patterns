@@ -51,6 +51,7 @@ export const RISKS = freezeList(["low", "medium", "high", "critical"]);
 export const TARGET_MODES = freezeList(["automatic", "explicit"]);
 export const OUTPUT_SHAPES = freezeList(["text", "structured", "code", "tool-call", "mixed"]);
 export const AMBIGUITIES = freezeList(["none", "low", "medium", "high"]);
+export const LOW_CONFIDENCE_THRESHOLD = 0.6;
 export const PROMPT_FRAGMENT_KINDS = freezeList([
   "instruction",
   "context",
@@ -77,7 +78,8 @@ export const OUTPUT_FIELDS = freezeList([
   "lifecycleGuidance",
   "warnings",
   "rationale",
-  "confidence"
+  "confidence",
+  "needsOperator"
 ]);
 
 export const CONTRACT_LIMITS = deepFreeze({
@@ -85,7 +87,12 @@ export const CONTRACT_LIMITS = deepFreeze({
   maxLatencyMs: 86_400_000,
   maxLifecycleGuidanceEntries: 16,
   maxLifecycleGuidanceLength: 1_000,
-  maxRationaleLength: 2_000
+  maxRationaleLength: 2_000,
+  minOperatorAlternatives: 2,
+  maxOperatorAlternatives: 5,
+  maxOperatorQuestionLength: 500,
+  maxOperatorContextLength: 1_000,
+  maxOperatorOptionDescriptionLength: 1_000
 });
 
 export const LIMITS = CONTRACT_LIMITS;
@@ -188,6 +195,104 @@ export const OUTPUT_SCHEMA = deepFreeze({
       type: "number",
       minimum: 0,
       maximum: 1
+    },
+    needsOperator: {
+      oneOf: [
+        { type: "null" },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["reasons", "alternatives", "question"],
+          properties: {
+            reasons: {
+              type: "array",
+              minItems: 1,
+              maxItems: 2,
+              uniqueItems: true,
+              items: { type: "string", enum: ["tie", "low-confidence"] }
+            },
+            alternatives: {
+              type: "array",
+              minItems: CONTRACT_LIMITS.minOperatorAlternatives,
+              maxItems: CONTRACT_LIMITS.maxOperatorAlternatives,
+              uniqueItems: true,
+              items: { type: "string", enum: schemaEnum(PATTERN_IDS) }
+            },
+            question: {
+              type: "object",
+              additionalProperties: false,
+              required: [
+                "question",
+                "question_type",
+                "context",
+                "options",
+                "recommendation",
+                "blocking",
+                "semantic_key"
+              ],
+              properties: {
+                question: {
+                  type: "string",
+                  minLength: 1,
+                  pattern: "\\S",
+                  maxLength: CONTRACT_LIMITS.maxOperatorQuestionLength
+                },
+                question_type: { const: "single_select" },
+                context: {
+                  type: "object",
+                  minProperties: 1,
+                  additionalProperties: {
+                    oneOf: [
+                      {
+                        type: "string",
+                        minLength: 1,
+                        pattern: "\\S",
+                        maxLength: CONTRACT_LIMITS.maxOperatorContextLength
+                      },
+                      {
+                        type: "array",
+                        minItems: 1,
+                        items: {
+                          type: "string",
+                          minLength: 1,
+                          pattern: "\\S",
+                          maxLength: CONTRACT_LIMITS.maxOperatorContextLength
+                        }
+                      }
+                    ]
+                  }
+                },
+                options: {
+                  type: "array",
+                  minItems: CONTRACT_LIMITS.minOperatorAlternatives,
+                  maxItems: CONTRACT_LIMITS.maxOperatorAlternatives,
+                  uniqueItems: true,
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["label", "description"],
+                    properties: {
+                      label: { type: "string", enum: schemaEnum(PATTERN_IDS) },
+                      description: {
+                        type: "string",
+                        minLength: 1,
+                        pattern: "\\S",
+                        maxLength: CONTRACT_LIMITS.maxOperatorOptionDescriptionLength
+                      }
+                    }
+                  }
+                },
+                recommendation: { type: "string", enum: schemaEnum(PATTERN_IDS) },
+                blocking: { const: true },
+                semantic_key: {
+                  type: "string",
+                  pattern: "^prompt-pattern-selection:v1:[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 });
@@ -201,6 +306,18 @@ const targetFields = ["mode", "model"];
 const budgetFields = ["maxTokens", "maxLatencyMs"];
 const fragmentFields = ["kind", "text"];
 const lifecycleGuidanceFields = ["phase", "guidance"];
+const needsOperatorFields = ["reasons", "alternatives", "question"];
+const operatorQuestionFields = [
+  "question",
+  "question_type",
+  "context",
+  "options",
+  "recommendation",
+  "blocking",
+  "semantic_key"
+];
+const operatorOptionFields = ["label", "description"];
+const operatorReasons = ["tie", "low-confidence"];
 
 const isRecord = (value) => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -259,10 +376,19 @@ const readOwnDataProperty = (value, key) => {
 
 const readOwnDataValue = (value, key) => readOwnDataProperty(value, key).value;
 
+const assignOwnDataProperty = (target, key, value) => {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true
+  });
+};
+
 const copyOwnDataProperty = (source, target, key) => {
   const property = readOwnDataProperty(source, key);
   if (property.present && property.readable) {
-    target[key] = property.value;
+    assignOwnDataProperty(target, key, property.value);
   }
 };
 
@@ -353,6 +479,62 @@ const checkBoundedPositiveInteger = (value, path, maximum, issues) => {
     return false;
   }
   return true;
+};
+
+const checkClarificationContext = (value, path, issues) => {
+  if (!isRecord(value)) {
+    addIssue(issues, path, "type", "Expected a plain object.");
+    return false;
+  }
+
+  const descriptors = inspectOwnDescriptors(value, path, issues);
+  let entryCount = 0;
+  for (const key of descriptors.keys()) {
+    const renderedKey = typeof key === "symbol" ? key.toString() : key;
+    if (typeof key !== "string" || key.trim().length === 0) {
+      addIssue(issues, pathForKey(path, renderedKey), "empty-key", "Context keys must be non-empty strings.");
+      continue;
+    }
+
+    const item = readOwnData(descriptors, key);
+    if (!item.readable) {
+      continue;
+    }
+    entryCount += 1;
+    const itemPath = pathForKey(path, key);
+    if (typeof item.value === "string") {
+      checkString(item.value, itemPath, issues, {
+        nonEmpty: true,
+        maxLength: CONTRACT_LIMITS.maxOperatorContextLength
+      });
+      continue;
+    }
+    if (Array.isArray(item.value)) {
+      const array = checkArray(item.value, itemPath, issues);
+      if (!array || !array.readable) {
+        continue;
+      }
+      if (array.length === 0) {
+        addIssue(issues, itemPath, "empty", "Context array values must be non-empty.");
+      }
+      for (let index = 0; index < array.length; index += 1) {
+        const part = readOwnData(array.descriptors, String(index));
+        if (part.readable) {
+          checkString(part.value, `${itemPath}.${index}`, issues, {
+            nonEmpty: true,
+            maxLength: CONTRACT_LIMITS.maxOperatorContextLength
+          });
+        }
+      }
+      continue;
+    }
+    addIssue(issues, itemPath, "type", "Context values must be non-empty strings or string arrays.");
+  }
+
+  if (entryCount === 0) {
+    addIssue(issues, path, "empty", "Context must contain at least one entry.");
+  }
+  return descriptors;
 };
 
 const validateInputValue = (input) => {
@@ -576,6 +758,213 @@ const validateOutputValue = (output) => {
     }
   }
 
+  const needsOperator = readOwnData(outputDescriptors, "needsOperator");
+  if (needsOperator.readable && needsOperator.value !== null) {
+    const needsOperatorDescriptors = checkRecord(
+      needsOperator.value,
+      "$.needsOperator",
+      needsOperatorFields,
+      needsOperatorFields,
+      issues
+    );
+    if (needsOperatorDescriptors) {
+      const reasonsValue = readOwnData(needsOperatorDescriptors, "reasons");
+      const reasonsArray = reasonsValue.readable
+        ? checkArray(reasonsValue.value, "$.needsOperator.reasons", issues)
+        : false;
+      if (reasonsArray && reasonsArray.readable) {
+        if (reasonsArray.length < 1 || reasonsArray.length > operatorReasons.length) {
+          addIssue(issues, "$.needsOperator.reasons", "bounded", "Operator reasons must contain one or two entries.");
+        }
+        const seenReasons = new Set();
+        for (let index = 0; index < reasonsArray.length; index += 1) {
+          const path = `$.needsOperator.reasons.${index}`;
+          const reason = readOwnData(reasonsArray.descriptors, String(index));
+          if (reason.readable && checkEnum(reason.value, path, operatorReasons, issues)) {
+            if (seenReasons.has(reason.value)) {
+              addIssue(issues, path, "duplicate", "Operator reasons must be unique.");
+            }
+            seenReasons.add(reason.value);
+          }
+        }
+      }
+
+      const alternativesValue = readOwnData(needsOperatorDescriptors, "alternatives");
+      const alternativesArray = alternativesValue.readable
+        ? checkArray(alternativesValue.value, "$.needsOperator.alternatives", issues)
+        : false;
+      const alternatives = [];
+      if (alternativesArray && alternativesArray.readable) {
+        if (
+          alternativesArray.length < CONTRACT_LIMITS.minOperatorAlternatives ||
+          alternativesArray.length > CONTRACT_LIMITS.maxOperatorAlternatives
+        ) {
+          addIssue(
+            issues,
+            "$.needsOperator.alternatives",
+            "bounded",
+            `Operator alternatives must contain ${CONTRACT_LIMITS.minOperatorAlternatives} to ${CONTRACT_LIMITS.maxOperatorAlternatives} entries.`
+          );
+        }
+        const seenAlternatives = new Set();
+        for (let index = 0; index < alternativesArray.length; index += 1) {
+          const path = `$.needsOperator.alternatives.${index}`;
+          const alternative = readOwnData(alternativesArray.descriptors, String(index));
+          if (alternative.readable && checkEnum(alternative.value, path, PATTERN_IDS, issues)) {
+            if (seenAlternatives.has(alternative.value)) {
+              addIssue(issues, path, "duplicate", "Operator alternatives must be unique.");
+            }
+            seenAlternatives.add(alternative.value);
+            alternatives.push(alternative.value);
+          }
+        }
+        if (primaryPatternIsValid && !seenAlternatives.has(primaryPattern.value)) {
+          addIssue(
+            issues,
+            "$.needsOperator.alternatives",
+            "primary-missing",
+            "Operator alternatives must include the primary pattern."
+          );
+        }
+      }
+
+      const questionValue = readOwnData(needsOperatorDescriptors, "question");
+      const questionDescriptors = questionValue.readable
+        ? checkRecord(
+            questionValue.value,
+            "$.needsOperator.question",
+            operatorQuestionFields,
+            operatorQuestionFields,
+            issues
+          )
+        : false;
+      if (questionDescriptors) {
+        const question = readOwnData(questionDescriptors, "question");
+        const questionType = readOwnData(questionDescriptors, "question_type");
+        const context = readOwnData(questionDescriptors, "context");
+        const optionsValue = readOwnData(questionDescriptors, "options");
+        const recommendation = readOwnData(questionDescriptors, "recommendation");
+        const blocking = readOwnData(questionDescriptors, "blocking");
+        const semanticKey = readOwnData(questionDescriptors, "semantic_key");
+
+        if (question.readable) {
+          checkString(question.value, "$.needsOperator.question.question", issues, {
+            nonEmpty: true,
+            maxLength: CONTRACT_LIMITS.maxOperatorQuestionLength
+          });
+        }
+        if (questionType.readable && questionType.value !== "single_select") {
+          addIssue(issues, "$.needsOperator.question.question_type", "const", "Question type must be single_select.");
+        }
+        if (context.readable) {
+          checkClarificationContext(context.value, "$.needsOperator.question.context", issues);
+        }
+
+        const optionsArray = optionsValue.readable
+          ? checkArray(optionsValue.value, "$.needsOperator.question.options", issues)
+          : false;
+        const optionLabels = [];
+        if (optionsArray && optionsArray.readable) {
+          if (
+            optionsArray.length < CONTRACT_LIMITS.minOperatorAlternatives ||
+            optionsArray.length > CONTRACT_LIMITS.maxOperatorAlternatives
+          ) {
+            addIssue(
+              issues,
+              "$.needsOperator.question.options",
+              "bounded",
+              `Question options must contain ${CONTRACT_LIMITS.minOperatorAlternatives} to ${CONTRACT_LIMITS.maxOperatorAlternatives} entries.`
+            );
+          }
+          const seenLabels = new Set();
+          for (let index = 0; index < optionsArray.length; index += 1) {
+            const path = `$.needsOperator.question.options.${index}`;
+            const option = readOwnData(optionsArray.descriptors, String(index));
+            if (!option.readable) {
+              continue;
+            }
+            const optionDescriptors = checkRecord(
+              option.value,
+              path,
+              operatorOptionFields,
+              operatorOptionFields,
+              issues
+            );
+            if (!optionDescriptors) {
+              continue;
+            }
+            const label = readOwnData(optionDescriptors, "label");
+            const description = readOwnData(optionDescriptors, "description");
+            if (label.readable && checkEnum(label.value, `${path}.label`, PATTERN_IDS, issues)) {
+              if (seenLabels.has(label.value)) {
+                addIssue(issues, `${path}.label`, "duplicate", "Question option labels must be unique.");
+              }
+              seenLabels.add(label.value);
+              optionLabels.push(label.value);
+            }
+            if (description.readable) {
+              checkString(description.value, `${path}.description`, issues, {
+                nonEmpty: true,
+                maxLength: CONTRACT_LIMITS.maxOperatorOptionDescriptionLength
+              });
+            }
+          }
+        }
+
+        if (
+          alternativesArray && alternativesArray.readable &&
+          optionsArray && optionsArray.readable &&
+          (alternatives.length !== optionLabels.length ||
+            alternatives.some((alternative, index) => optionLabels[index] !== alternative))
+        ) {
+          addIssue(
+            issues,
+            "$.needsOperator.question.options",
+            "relationship",
+            "Question option labels must match alternatives in order."
+          );
+        }
+        if (recommendation.readable && checkEnum(
+          recommendation.value,
+          "$.needsOperator.question.recommendation",
+          PATTERN_IDS,
+          issues
+        )) {
+          if (!optionLabels.includes(recommendation.value)) {
+            addIssue(
+              issues,
+              "$.needsOperator.question.recommendation",
+              "relationship",
+              "Question recommendation must name an option."
+            );
+          }
+          if (primaryPatternIsValid && recommendation.value !== primaryPattern.value) {
+            addIssue(
+              issues,
+              "$.needsOperator.question.recommendation",
+              "relationship",
+              "Question recommendation must name the primary pattern."
+            );
+          }
+        }
+        if (blocking.readable && blocking.value !== true) {
+          addIssue(issues, "$.needsOperator.question.blocking", "const", "Operator question must be blocking.");
+        }
+        if (semanticKey.readable) {
+          if (!checkString(semanticKey.value, "$.needsOperator.question.semantic_key", issues, { nonEmpty: true }) ||
+            !/^prompt-pattern-selection:v1:[a-f0-9]{64}$/.test(semanticKey.value)) {
+            addIssue(
+              issues,
+              "$.needsOperator.question.semantic_key",
+              "format",
+              "Semantic key must use the prompt-pattern-selection:v1 SHA-256 format."
+            );
+          }
+        }
+      }
+    }
+  }
+
   return issues;
 };
 
@@ -602,11 +991,54 @@ const freezeNormalizedInput = (input) => {
   });
 };
 
+const copyClarificationContext = (source) => {
+  const copy = Object.create(null);
+  for (const key of Reflect.ownKeys(source)) {
+    const value = readOwnDataValue(source, key);
+    assignOwnDataProperty(
+      copy,
+      key,
+      Array.isArray(value)
+        ? copyArray(value, (array, index) => readOwnDataValue(array, String(index)))
+        : value
+    );
+  }
+  return copy;
+};
+
 const freezeNormalizedOutput = (output) => {
   const overlaysSource = readOwnDataValue(output, "overlays");
   const promptFragmentsSource = readOwnDataValue(output, "promptFragments");
   const lifecycleGuidanceSource = readOwnDataValue(output, "lifecycleGuidance");
   const warningsSource = readOwnDataValue(output, "warnings");
+  const needsOperatorSource = readOwnDataValue(output, "needsOperator");
+
+  let needsOperator = null;
+  if (needsOperatorSource !== null) {
+    const reasonsSource = readOwnDataValue(needsOperatorSource, "reasons");
+    const alternativesSource = readOwnDataValue(needsOperatorSource, "alternatives");
+    const questionSource = readOwnDataValue(needsOperatorSource, "question");
+    const optionsSource = readOwnDataValue(questionSource, "options");
+    needsOperator = {
+      reasons: copyArray(reasonsSource, (source, index) => readOwnDataValue(source, String(index))),
+      alternatives: copyArray(alternativesSource, (source, index) => readOwnDataValue(source, String(index))),
+      question: {
+        question: readOwnDataValue(questionSource, "question"),
+        question_type: readOwnDataValue(questionSource, "question_type"),
+        context: copyClarificationContext(readOwnDataValue(questionSource, "context")),
+        options: copyArray(optionsSource, (source, index) => {
+          const option = readOwnDataValue(source, String(index));
+          return {
+            label: readOwnDataValue(option, "label"),
+            description: readOwnDataValue(option, "description")
+          };
+        }),
+        recommendation: readOwnDataValue(questionSource, "recommendation"),
+        blocking: readOwnDataValue(questionSource, "blocking"),
+        semantic_key: readOwnDataValue(questionSource, "semantic_key")
+      }
+    };
+  }
 
   return deepFreeze({
     primaryPattern: readOwnDataValue(output, "primaryPattern"),
@@ -627,7 +1059,8 @@ const freezeNormalizedOutput = (output) => {
     }),
     warnings: copyArray(warningsSource, (source, index) => readOwnDataValue(source, String(index))),
     rationale: readOwnDataValue(output, "rationale"),
-    confidence: readOwnDataValue(output, "confidence")
+    confidence: readOwnDataValue(output, "confidence"),
+    needsOperator
   });
 };
 

@@ -30,11 +30,16 @@ The output shape has exactly these top-level fields:
 ```js
 {
   primaryPattern, overlays, promptFragments,
-  lifecycleGuidance, warnings, rationale, confidence
+  lifecycleGuidance, warnings, rationale, confidence,
+  needsOperator
 }
 ```
 
 `overlays` contain unique catalog IDs and cannot repeat `primaryPattern`. Prompt fragments use `{ kind, text }`, lifecycle guidance uses unique `{ phase, guidance }` entries, and `confidence` is a finite number from `0` through `1`. Guidance and rationale have exported length bounds.
+
+`needsOperator` is required. It is `null` for an ordinary recommendation, or `{ reasons, alternatives, question }` when exact top scores tie, confidence is below the exported `LOW_CONFIDENCE_THRESHOLD` (`0.60`), or both. Reasons are a unique subset of `tie` and `low-confidence`. Alternatives contain 2–5 unique ranked `PatternId` values, include `primaryPattern`, and match the question's option labels in order.
+
+The nested `question` can be passed directly to `arc_ask_operator`: it has one bounded `single_select` question and context, 2–5 `{ label, description }` options, the primary as its named recommendation, `blocking: true`, and a stable `prompt-pattern-selection:v1:<sha256>` semantic key.
 
 `normalizeInput` and `normalizeOutput` strictly validate and return deeply frozen copies. `isValidInput` and `isValidOutput` provide boolean checks. Unknown keys are rejected recursively, including keys on nested contract objects; input values are not mutated.
 
@@ -61,7 +66,9 @@ const recommendation = recommend({
 });
 ```
 
-The pure rule engine considers every input dimension. It selects a primary from the fixed catalog, ranks compatible overlays, and supplies prompt fragments, phase guidance, warnings, rationale, and confidence. Equal scores use catalog order as a stable tie-break. Tight token or latency budgets reduce optional guidance and add descriptive warnings; they do not trigger any external behavior.
+The pure rule engine considers every input dimension. It selects a primary from the fixed catalog, ranks compatible overlays, and supplies prompt fragments, phase guidance, warnings, rationale, and confidence. Equal scores still use catalog order as a stable primary fallback, while `needsOperator` exposes the tie for an operator decision. Tight token or latency budgets reduce optional guidance and add descriptive warnings; they do not reduce operator alternatives or trigger external behavior.
+
+Operator alternatives preserve deterministic ranking independently of overlay truncation. Semantic keys hash decision-relevant normalized input. Because automatic target mode ignores optional model hints for both recommendation behavior and semantic identity, adding or changing an automatic-mode hint does not change the recommendation or key.
 
 ### Reliability tiers
 
@@ -136,6 +143,8 @@ arc-prompt recommend --format json --input-json '{
 
 The command only selects and explains prompt patterns. It does not execute tasks, call workers, providers, or networks, write project files, select routes or workloads, grant authorization, or infer execution-policy settings.
 
+Human output renders whether an operator decision is needed and, when present, every reason, alternative, option, and semantic-key field. JSON output preserves the canonical object for direct integration.
+
 ## Orchestration integration guidance
 
 Package-owned guidance for ARC Pi parents lives in:
@@ -144,6 +153,8 @@ Package-owned guidance for ARC Pi parents lives in:
 - `prompts/orchestrate.md` — the same integration rules in prompt form for orchestration sessions.
 
 Recommendations remain descriptive parent-local advice. Workers receive a finalized bounded contract and never choose their own pattern, route, workload, or authorization.
+
+When `needsOperator` is non-null, the parent queries `arc_decisions` using `needsOperator.question.semantic_key`. It may reuse exactly one effective answer only when the selected label is still one of `needsOperator.alternatives`; otherwise it passes `needsOperator.question` directly to `arc_ask_operator`. A recorded, reused, unresolved, or cancelled pattern decision never grants Implement or Deploy authorization.
 
 ## Development
 

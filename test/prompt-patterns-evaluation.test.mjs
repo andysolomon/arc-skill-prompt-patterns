@@ -14,7 +14,7 @@ import {
   validateFixtureIndex
 } from "./fixtures/prompt-patterns/index.mjs";
 
-const EXPECTED_FIELDS = ["primaryPattern", "overlays", "warnings", "confidence"];
+const EXPECTED_FIELDS = ["primaryPattern", "overlays", "warnings", "confidence", "needsOperator"];
 const EXECUTION_POLICY_KEYS = new Set([
   "route",
   "workload",
@@ -41,7 +41,7 @@ const visitKeys = (value, visitor) => {
 
 test("validates the fixture index and required coverage", () => {
   assert.deepEqual(FIXTURE_CATEGORIES, ["source-guide", "arc-lifecycle"]);
-  assert.equal(FIXTURE_COUNT, 14);
+  assert.equal(FIXTURE_COUNT, 16);
   assert.equal(isValidFixtureIndex(), true);
   assert.doesNotThrow(() => validateFixtureIndex());
 
@@ -87,6 +87,15 @@ test("matches every literal expected recommendation deterministically", () => {
     evaluated += 1;
   }
   assert.equal(evaluated, FIXTURE_COUNT);
+});
+
+test("fixtures cover ordinary, tie, low-confidence, and combined operator decisions", () => {
+  const reasons = FIXTURES.map(({ expected }) => expected.needsOperator?.reasons.join("+") ?? "ordinary");
+
+  assert.equal(reasons.includes("ordinary"), true);
+  assert.equal(reasons.includes("tie"), true);
+  assert.equal(reasons.includes("low-confidence"), true);
+  assert.equal(reasons.includes("tie+low-confidence"), true);
 });
 
 const TIER_ACCEPTANCE_MARKERS = {

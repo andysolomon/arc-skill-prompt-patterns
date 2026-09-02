@@ -44,7 +44,28 @@ const validOutput = () => ({
   ],
   warnings: ["Evidence quality may limit confidence."],
   rationale: "Grounding keeps research claims tied to available evidence.",
-  confidence: 0.86
+  confidence: 0.86,
+  needsOperator: null
+});
+
+const validNeedsOperator = () => ({
+  reasons: ["tie"],
+  alternatives: ["evidence-grounding", "few-shot"],
+  question: {
+    question: "Which prompt pattern should be primary?",
+    question_type: "single_select",
+    context: {
+      reason: "The top recommendation score is tied.",
+      action: "Select one bounded pattern alternative before continuing."
+    },
+    options: [
+      { label: "evidence-grounding", description: "Tie claims to supplied evidence." },
+      { label: "few-shot", description: "Use representative examples." }
+    ],
+    recommendation: "evidence-grounding",
+    blocking: true,
+    semantic_key: `prompt-pattern-selection:v1:${"a".repeat(64)}`
+  }
 });
 
 const assertDeepFrozen = (value) => {
@@ -107,6 +128,11 @@ test("schemas require exact top-level fields and strict nested objects", () => {
   assert.equal(INPUT_SCHEMA.properties.budget.additionalProperties, false);
   assert.equal(OUTPUT_SCHEMA.properties.promptFragments.items.additionalProperties, false);
   assert.equal(OUTPUT_SCHEMA.properties.lifecycleGuidance.items.additionalProperties, false);
+  assert.equal(OUTPUT_SCHEMA.properties.needsOperator.oneOf[1].additionalProperties, false);
+  assert.equal(
+    OUTPUT_SCHEMA.properties.needsOperator.oneOf[1].properties.question.properties.question_type.const,
+    "single_select"
+  );
   assert.equal(INPUT_SCHEMA.properties.target.properties.model.pattern, "\\S");
   assert.equal(OUTPUT_SCHEMA.properties.promptFragments.items.properties.text.pattern, "\\S");
   assert.equal(OUTPUT_SCHEMA.properties.lifecycleGuidance.items.properties.guidance.pattern, "\\S");
@@ -159,12 +185,170 @@ test("accepts a valid output and returns an immutable normalized copy", () => {
   assert.notEqual(normalized.promptFragments, source.promptFragments);
   assert.notEqual(normalized.lifecycleGuidance, source.lifecycleGuidance);
   assert.notEqual(normalized.warnings, source.warnings);
+  assert.equal(normalized.needsOperator, null);
   assert.equal(isValidOutput(source), true);
   assertDeepFrozen(normalized);
   assertDeepFrozen(PATTERN_CATALOG);
   assertDeepFrozen(PATTERN_IDS);
   assertDeepFrozen(INPUT_SCHEMA);
   assertDeepFrozen(OUTPUT_SCHEMA);
+});
+
+test("accepts, copies, and deeply freezes a strict operator recommendation", () => {
+  const source = { ...validOutput(), needsOperator: validNeedsOperator() };
+  const normalized = normalizeOutput(source);
+  const comparable = (output) => ({
+    ...output,
+    needsOperator: {
+      ...output.needsOperator,
+      question: {
+        ...output.needsOperator.question,
+        context: { ...output.needsOperator.question.context }
+      }
+    }
+  });
+
+  assert.deepEqual(comparable(normalized), comparable(source));
+  assert.notEqual(normalized.needsOperator, source.needsOperator);
+  assert.notEqual(normalized.needsOperator.alternatives, source.needsOperator.alternatives);
+  assert.notEqual(normalized.needsOperator.question, source.needsOperator.question);
+  assert.notEqual(normalized.needsOperator.question.options, source.needsOperator.question.options);
+  assert.notEqual(normalized.needsOperator.question.context, source.needsOperator.question.context);
+  assert.equal(Object.getPrototypeOf(normalized.needsOperator.question.context), null);
+  assertDeepFrozen(normalized.needsOperator);
+});
+
+test("preserves __proto__ context keys as own data on a null-prototype copy", () => {
+  const needsOperator = validNeedsOperator();
+  const context = Object.create(null);
+  context.reason = "The top recommendation score is tied.";
+  context.action = "Select one bounded pattern alternative before continuing.";
+  context.__proto__ = "preserved-own-key";
+  needsOperator.question.context = context;
+
+  const source = { ...validOutput(), needsOperator };
+  const normalized = normalizeOutput(source);
+  const copied = normalized.needsOperator.question.context;
+
+  assert.equal(Object.getPrototypeOf(copied), null);
+  assert.equal(Object.hasOwn(copied, "__proto__"), true);
+  assert.equal(copied.__proto__, "preserved-own-key");
+  assert.equal("preserved-own-key" in Object.prototype, false);
+  assert.equal(Object.getPrototypeOf({}), Object.prototype);
+  assert.equal(isValidOutput(normalized), true);
+  assertDeepFrozen(normalized);
+});
+
+test("rejects malformed operator context values and accessors without invoking getters", () => {
+  const withNeedsOperator = (mutate) => {
+    const needsOperator = validNeedsOperator();
+    mutate(needsOperator);
+    return { ...validOutput(), needsOperator };
+  };
+
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.context = "legacy string"; })),
+    "$.needsOperator.question.context"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.context = {}; })),
+    "$.needsOperator.question.context"
+  );
+
+  let emptyContextReads = 0;
+  const emptyContextOutput = withNeedsOperator((value) => {
+    Object.defineProperty(value.question, "context", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        emptyContextReads += 1;
+        return {};
+      }
+    });
+  });
+  assertAccessorRejected(
+    () => normalizeOutput(emptyContextOutput),
+    "$.needsOperator.question.context",
+    () => emptyContextReads
+  );
+
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.context = { "": "missing key" }; })),
+    "$.needsOperator.question.context."
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.context = { reason: " " }; })),
+    "$.needsOperator.question.context.reason"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.context = { reason: [] }; })),
+    "$.needsOperator.question.context.reason"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.context = { reason: [""] }; })),
+    "$.needsOperator.question.context.reason.0"
+  );
+
+  const withArrayContext = withNeedsOperator((value) => {
+    value.question.context = {
+      reason: "The top recommendation score is tied.",
+      evidence: ["equal top scores", "below confidence threshold"]
+    };
+  });
+  assert.equal(normalizeOutput(withArrayContext).needsOperator.question.context.evidence.length, 2);
+
+  let contextReads = 0;
+  const operatorOutput = { ...validOutput(), needsOperator: validNeedsOperator() };
+  Object.defineProperty(operatorOutput.needsOperator.question.context, "reason", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      contextReads += 1;
+      return "The top recommendation score is tied.";
+    }
+  });
+  assertAccessorRejected(
+    () => normalizeOutput(operatorOutput),
+    "$.needsOperator.question.context.reason",
+    () => contextReads
+  );
+});
+
+test("rejects malformed operator bounds and relationships", () => {
+  const withNeedsOperator = (mutate) => {
+    const needsOperator = validNeedsOperator();
+    mutate(needsOperator);
+    return { ...validOutput(), needsOperator };
+  };
+
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.reasons = ["tie", "tie"]; })),
+    "$.needsOperator.reasons.1"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.alternatives = ["evidence-grounding"]; })),
+    "$.needsOperator.alternatives"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.alternatives = ["few-shot", "boundary"]; })),
+    "$.needsOperator.alternatives"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.options[1].label = "boundary"; })),
+    "$.needsOperator.question.options"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.recommendation = "few-shot"; })),
+    "$.needsOperator.question.recommendation"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.blocking = false; })),
+    "$.needsOperator.question.blocking"
+  );
+  assertInvalid(
+    () => normalizeOutput(withNeedsOperator((value) => { value.question.semantic_key = "unstable"; })),
+    "$.needsOperator.question.semantic_key"
+  );
 });
 
 test("rejects output relationship, shape, and bound violations", () => {
@@ -249,6 +433,10 @@ test("rejects unknown keys recursively instead of discarding them", () => {
   guidanceUnknown.lifecycleGuidance[0].extra = true;
   assertInvalid(() => normalizeOutput(guidanceUnknown), "$.lifecycleGuidance.0.extra");
 
+  const operatorUnknown = { ...validOutput(), needsOperator: validNeedsOperator() };
+  operatorUnknown.needsOperator.question.options[0].extra = true;
+  assertInvalid(() => normalizeOutput(operatorUnknown), "$.needsOperator.question.options.0.extra");
+
   const outputUnknown = validOutput();
   outputUnknown.extra = true;
   assertInvalid(() => normalizeOutput(outputUnknown), "$.extra");
@@ -302,6 +490,22 @@ test("rejects accessors without invoking top-level, nested, or array properties"
     }
   });
   assertAccessorRejected(() => normalizeOutput(nestedOutput), "$.promptFragments.0.text", () => nestedOutputReads);
+
+  let operatorReads = 0;
+  const operatorOutput = { ...validOutput(), needsOperator: validNeedsOperator() };
+  Object.defineProperty(operatorOutput.needsOperator.question.options[0], "label", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      operatorReads += 1;
+      return "evidence-grounding";
+    }
+  });
+  assertAccessorRejected(
+    () => normalizeOutput(operatorOutput),
+    "$.needsOperator.question.options.0.label",
+    () => operatorReads
+  );
 });
 
 test("keeps execution concerns outside the executable contract", () => {

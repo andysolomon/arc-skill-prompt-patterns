@@ -38,6 +38,13 @@ Use the output only to draft the worker contract:
 - `warnings` become contract caveats or acceptance notes
 - `rationale` becomes a concise preamble—never hidden reasoning or chain-of-thought
 - `confidence` informs whether to tighten verification or ask the operator before delegating
+- `needsOperator` is `null` for an ordinary recommendation or carries the blocking tie/below-0.60 pattern decision
+
+## Resolve `needsOperator`
+
+When `needsOperator` is non-null, query `arc_decisions` with `needsOperator.question.semantic_key`. Reuse a choice only when exactly one effective valid answer exists and its label is still in `needsOperator.alternatives`. Otherwise pass `needsOperator.question` directly to `arc_ask_operator`; it is one bounded `single_select` question with context, 2–5 unique labeled options, a named recommendation, `blocking: true`, and a stable semantic key.
+
+Do not infer a choice from an unresolved or cancelled question. A recorded or reused choice selects only the prompt pattern. Recorded, reused, unresolved, and cancelled decisions never grant Implement authorization or Deploy authorization.
 
 ## Reliability tiers
 

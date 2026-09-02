@@ -16,7 +16,8 @@ export const ARC_LIFECYCLE_FIXTURES = [
       primaryPattern: "evidence-grounding",
       overlays: ["hypothesis-test", "boundary", "decomposition"],
       warnings: [],
-      confidence: 0.7
+      confidence: 0.7,
+      needsOperator: null
     }
   },
   {
@@ -36,7 +37,8 @@ export const ARC_LIFECYCLE_FIXTURES = [
       primaryPattern: "decomposition",
       overlays: ["boundary", "template-fill", "critique"],
       warnings: [],
-      confidence: 0.78
+      confidence: 0.78,
+      needsOperator: null
     }
   },
   {
@@ -58,7 +60,8 @@ export const ARC_LIFECYCLE_FIXTURES = [
       warnings: [
         "The token budget is tight; keep instructions compact and prioritize the primary pattern."
       ],
-      confidence: 0.78
+      confidence: 0.78,
+      needsOperator: null
     }
   },
   {
@@ -81,7 +84,8 @@ export const ARC_LIFECYCLE_FIXTURES = [
         "High ambiguity lowers confidence; resolve outcome-changing assumptions before relying on the result.",
         "The latency budget is tight; avoid optional iterative prompt passes."
       ],
-      confidence: 0.6
+      confidence: 0.6,
+      needsOperator: null
     }
   },
   {
@@ -104,7 +108,8 @@ export const ARC_LIFECYCLE_FIXTURES = [
         "Critical risk requires independent review and explicit checks outside this descriptive recommendation.",
         "High-assurance acceptance fails closed: resolve the unresolved assumptions that could change the result, and name each unresolved assumption or required operator decision before relying on this result."
       ],
-      confidence: 0.68
+      confidence: 0.68,
+      needsOperator: null
     }
   },
   {
@@ -126,7 +131,8 @@ export const ARC_LIFECYCLE_FIXTURES = [
       warnings: [
         "The model profile is unverified; do not assume structured output, tool use, or reasoning controls."
       ],
-      confidence: 0.72
+      confidence: 0.72,
+      needsOperator: null
     }
   }
 ];
